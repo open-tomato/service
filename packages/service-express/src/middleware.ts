@@ -10,6 +10,13 @@ import helmet from 'helmet';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 
+/** Request headers that carry credentials, removed from every request log entry. */
+const REDACTED_HEADERS = [
+  'req.headers.authorization',
+  'req.headers.cookie',
+  'req.headers["x-api-key"]',
+];
+
 /**
  * Attaches the standard middleware stack to the given Express app.
  *
@@ -46,7 +53,7 @@ export function applyMiddleware(
       config.rateLimit ?? { max: 100, windowMs: 60_000, standardHeaders: true, legacyHeaders: false },
     ),
   );
-  app.use(pinoHttp({ logger: httpLogger }));
+  app.use(pinoHttp({ logger: httpLogger, redact: REDACTED_HEADERS }));
 }
 
 type HttpError = {
