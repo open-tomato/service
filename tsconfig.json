@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "root: scripts and config files, run by Bun; each package has its own",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "Preserve",
+    "moduleResolution": "bundler",
+    "allowJs": true,
+    "types": ["node", "bun"]
+  },
+  "include": ["scripts", "*.mjs", "*.ts"],
+  "exclude": ["scripts/privacy-check.ts"]
+}

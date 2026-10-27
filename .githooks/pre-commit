@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Privacy check on what this commit stages: secrets, private addresses, home paths, foreign emails.
+# A denylist kept outside the repo is added when PRIVACY_DENYLIST, or else git config privacy.denylist,
+# names a file; named but unreadable stops the commit, so a broken path never passes silently.
+# Binaries a person has reviewed are listed, by content hash, in the committed .privacy-reviewed.
+# Turn it on once per clone: git config core.hooksPath .githooks
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+staged="$(mktemp -d)"
+trap 'rm -rf "$staged"' EXIT
+git diff --cached --name-only --diff-filter=ACMRT -z | while IFS= read -r -d '' file; do
+  mkdir -p "$staged/$(dirname "$file")"
+  git show ":$file" > "$staged/$file"
+done
+args=("$staged")
+reviewed="$(mktemp)"
+trap 'rm -rf "$staged" "$reviewed"' EXIT
+if git cat-file -e :.privacy-reviewed 2>/dev/null; then
+  git show :.privacy-reviewed > "$reviewed"
+  args+=(--reviewed "$reviewed")
+fi
+denylist="${PRIVACY_DENYLIST:-$(git config --get privacy.denylist || true)}"
+if [ -n "$denylist" ]; then
+  if [ ! -r "$denylist" ]; then
+    echo "privacy check: the private denylist named cannot be read: set PRIVACY_DENYLIST or git config privacy.denylist to a readable file" >&2
+    exit 2
+  fi
+  args+=(--denylist "$denylist")
+else
+  echo "privacy check: no private denylist (PRIVACY_DENYLIST or git config privacy.denylist); generic rules only" >&2
+fi
+status=0
+PRIVACY_DENYLIST= bun "$root/scripts/privacy-check.ts" "${args[@]}" || status=$?
+exit "$status"

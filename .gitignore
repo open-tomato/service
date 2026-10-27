@@ -1,0 +1,20 @@
+# >>> rafa tracking: rafa rewrites the lines up to the end marker
+.rafa/
+# <<< rafa tracking
+node_modules
+dist
+.turbo
+*.tsbuildinfo
+*.tgz
+coverage
+.env*
+.DS_Store
+.eslintcache
+# local text and context files
+.tmp
+.docs
+.local
+.reference
+progress.txt
+.claude/settings.local.json
+.claude/worktrees/
