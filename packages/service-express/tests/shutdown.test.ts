@@ -1,7 +1,11 @@
+import type { ServiceLogger } from '@open-tomato/service';
+import type { Server } from 'node:http';
+
 import { createDependency } from '@open-tomato/service';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createService } from '../src/create-service.js';
+import { gracefulStop } from '../src/shutdown.js';
 
 // Tests run in test mode — no process.exit, ephemeral port
 process.env.NODE_ENV = 'test';
@@ -68,5 +72,44 @@ describe('shutdown — stop() behaviour', () => {
     // Both deps attempted a stop (dep2 first due to reverse order, then dep1)
     expect(stopOrder).toContain('dep-1');
     expect(stopOrder).toContain('dep-2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Drain timeout
+// ---------------------------------------------------------------------------
+
+describe('gracefulStop — drain timeout', () => {
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as ServiceLogger;
+
+  /** A server whose close() finishes only when every connection is closed. */
+  function serverWithOpenConnection(closesAtOnce: boolean) {
+    let onClosed: (() => void) | undefined;
+    const closeAllConnections = vi.fn(() => onClosed?.());
+    const server = {
+      close: (callback: () => void) => {
+        onClosed = callback;
+        if (closesAtOnce) callback();
+      },
+      closeAllConnections,
+    } as unknown as Server;
+    return { server, closeAllConnections };
+  }
+
+  it('forces open connections closed once the drain timeout passes', async () => {
+    const { server, closeAllConnections } = serverWithOpenConnection(false);
+
+    await gracefulStop(server, [], logger, 20);
+
+    expect(closeAllConnections).toHaveBeenCalledTimes(1);
+  }, 1_000);
+
+  it('leaves connections alone when the server drains in time', async () => {
+    const { server, closeAllConnections } = serverWithOpenConnection(true);
+
+    await gracefulStop(server, [], logger, 20);
+    await new Promise(resolve => setTimeout(resolve, 40));
+
+    expect(closeAllConnections).not.toHaveBeenCalled();
   });
 });

@@ -23,14 +23,14 @@ export async function gracefulStop(
   drainTimeout = 10_000,
 ): Promise<void> {
   logger.info('shutdown: stopping new connections');
-  await new Promise<void>(resolve => server.close(() => resolve()));
-
-  const timeout = setTimeout(() => {
-    logger.warn('shutdown: drain timeout reached — forcing close')
-    ;(server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
+  // Armed before waiting: close() resolves only once every open connection
+  // has ended, so a timer set after it could never fire.
+  const forceClose = setTimeout(() => {
+    logger.warn('shutdown: drain timeout reached — forcing close');
+    server.closeAllConnections();
   }, drainTimeout);
-
-  clearTimeout(timeout);
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  clearTimeout(forceClose);
 
   for (const dep of [...dependencies].reverse()) {
     try {
