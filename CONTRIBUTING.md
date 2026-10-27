@@ -30,7 +30,7 @@ The spec template ensures your proposal has the structure a plan can be built fr
    bun run gates
    ```
 
-   This runs the full suite in sequence: lint, check-types, test, test-scripts, build, check-node. Your PR must pass all gates. See [context/verification.md](context/verification.md) for what each gate checks.
+   This runs the full suite in sequence: lint, check-types, test, test-scripts, build, pack, check-node. Your PR must pass all gates. See [context/verification.md](context/verification.md) for what each gate checks.
 
 3. **Turn on the privacy hook** once per clone, so a commit never carries a local path or a credential:
    ```bash

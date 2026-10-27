@@ -43,13 +43,14 @@ function options(
 }
 
 describe('GATES', () => {
-  test('lists the six gates in run order', () => {
+  test('lists the seven gates in run order', () => {
     expect(GATES.map((gate) => gate.name)).toEqual([
       'lint',
       'check-types',
       'test',
       'test-scripts',
       'build',
+      'pack',
       'check-node',
     ]);
   });

@@ -10,7 +10,8 @@ at the first failure.
 | check-types | `turbo run check-types` and the root `tsc` | strict types under NodeNext, test files included |
 | test | `turbo run test` | each package's vitest suites |
 | test-scripts | `bun test scripts` | the repository scripts, such as the gate runner |
-| build | `turbo run build` | `tsc` emits JS, declarations and maps into each `dist/` |
+| build | `turbo run build` | `tsc` emits JS and declarations into each `dist/` |
+| pack | `bun run scripts/pack.ts` | each public package's tarball: real versions over `workspace:^`, `LICENSE` and `NOTICE` equal to the root's, every export target, nothing outside `dist/` |
 | check-node | `node scripts/check-node.mjs` | every public package's built entry imports under real Node |
 
 ## Scoped runs

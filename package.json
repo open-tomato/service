@@ -15,6 +15,7 @@
     "check-types": "turbo run check-types && tsc --noEmit -p tsconfig.json",
     "test": "turbo run test",
     "lint": "eslint .",
+    "pack-check": "bun run scripts/pack.ts",
     "check-node": "node scripts/check-node.mjs",
     "gates": "bun run scripts/gates.ts"
   },

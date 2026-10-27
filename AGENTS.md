@@ -22,8 +22,8 @@ concern lives today, and what is moving.
 
 ## Gates
 
-`bun run gates` runs lint, check-types, test, test-scripts, build and
-check-node, in that order, and stops at the first failure. Test files are
+`bun run gates` runs lint, check-types, test, test-scripts, build, pack
+and check-node, in that order, and stops at the first failure. Test files are
 type-checked too. `context/verification.md` says what each gate proves and
 how to run one scoped to a change.
 

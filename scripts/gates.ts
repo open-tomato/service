@@ -30,6 +30,7 @@ export const GATES: readonly Gate[] = [
   { name: 'test', command: ['bun', 'run', 'test'] },
   { name: 'test-scripts', command: ['bun', 'test', 'scripts'] },
   { name: 'build', command: ['bun', 'run', 'build'] },
+  { name: 'pack', command: ['bun', 'run', 'pack-check'] },
   { name: CHECK_NODE, command: ['bun', 'run', 'check-node'] },
 ];
 
