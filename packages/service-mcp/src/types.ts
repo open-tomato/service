@@ -6,7 +6,7 @@ export type { ClientsMap };
 /**
  * Transport mode for the MCP server.
  *
- * - `'http'` — default; used for deployed servers via `WebStandardStreamableHTTPServerTransport`
+ * - `'http'` — default; used for deployed servers via `StreamableHTTPServerTransport` on a Node HTTP server
  * - `'stdio'` — enabled via `MCP_TRANSPORT=stdio`; used for local dev and Claude Desktop
  */
 export type MCPTransport = 'http' | 'stdio';

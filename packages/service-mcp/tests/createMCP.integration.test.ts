@@ -1,8 +1,8 @@
 /**
  * Integration tests for MCP tool calls via WebStandardStreamableHTTPServerTransport.
  *
- * Uses a standalone Node.js HTTP server with proper ReadableStream piping to bypass
- * the Bun polyfill's fetchRes.text() which blocks on SSE/streaming responses. A
+ * Uses a standalone Node.js HTTP server that pipes the transport's ReadableStream
+ * bodies, so SSE responses stream instead of buffering. A
  * single Client instance is shared across all tests via beforeAll/afterAll since
  * McpServer supports only one client session at a time.
  */

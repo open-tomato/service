@@ -44,9 +44,9 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  * **3. Transport** — the transport is selected based on the `MCP_TRANSPORT`
  * environment variable:
  * - _(default)_ `MCP_TRANSPORT` unset or any value other than `'stdio'`:
- *   `WebStandardStreamableHTTPServerTransport` in stateful mode
- *   (`sessionIdGenerator: () => randomUUID()`), listening on `PORT` (default
- *   `8080`). Stateless mode is intentionally avoided — it breaks the MCP
+ *   `StreamableHTTPServerTransport` in stateful mode
+ *   (`sessionIdGenerator: () => randomUUID()`), served by a Node HTTP server
+ *   on `PORT` (default `8080`). Stateless mode is intentionally avoided — it breaks the MCP
  *   `initialize` handshake which requires at least two HTTP round-trips.
  * - `MCP_TRANSPORT=stdio`: `StdioServerTransport` for local dev and Claude
  *   Desktop integration. The health server is **not** started in this mode.

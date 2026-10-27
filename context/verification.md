@@ -31,9 +31,8 @@ now.
   `src/<module>.test.ts`, or under the package's `tests/` folder.
 - Test files are type-checked by check-types, so an `@ts-expect-error` in a
   test is a real assertion.
-- The MCP suites run under Node with a small `Bun.serve` stand-in
-  (`packages/service-mcp/tests/bun-polyfill.ts`), because the adapter's
-  HTTP transport calls `Bun.serve` today.
+- Suites run on Node with no Bun stand-ins, so a passing suite says the
+  code runs where the packages' users run it.
 
 ## Why check-node exists
 

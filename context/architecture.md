@@ -43,8 +43,6 @@ This table shows each concern's home today and where it is moving.
 
 ## Known limits
 
-- The MCP adapter is on `@modelcontextprotocol/sdk` 1.x. The SDK's 2.x line
-  is split into separate server, Node and Express packages; moving to it is
-  planned.
-- The MCP adapter's HTTP mode serves through `Bun.serve`, so it needs Bun;
-  a transport on Node's `http` module is planned.
+The MCP adapter is on `@modelcontextprotocol/sdk` 1.x. The SDK's 2.x line is
+split into separate server, Node and Express packages; moving to it is
+planned.

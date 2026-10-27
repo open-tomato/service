@@ -72,8 +72,7 @@ createMCP({
 ```
 
 The server listens over HTTP on `PORT` (default `8080`), or on stdio when
-`MCP_TRANSPORT=stdio`. HTTP mode needs Bun for now; a Node transport is
-planned.
+`MCP_TRANSPORT=stdio`.
 
 ## Requirements
 

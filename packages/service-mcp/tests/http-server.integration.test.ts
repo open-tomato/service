@@ -19,9 +19,8 @@ const HEALTH_PORT = 3099;
 const HEALTH_PATH = '/health';
 const SERVICE_ID = 'integration-test';
 
-// MCP transport ports must differ between tests: wireHttpTransport creates a
-// Bun server whose reference is not stored, so it cannot be stopped during
-// shutdown(). Using distinct ports prevents "address already in use" errors.
+// Each test listens on its own port, so a test never depends on the previous
+// one's server having released its port.
 const MCP_PORT_TEST1 = 8097;
 const MCP_PORT_TEST2 = 8096;
 
