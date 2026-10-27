@@ -1,0 +1,90 @@
+# Release publish: level 2 of rafa's release ladder, from rafa 0.47.0's
+# template, with this repository's gates, pinned actions and release keys.
+#
+# A pushed release tag (`<package>@<version>`, written by
+# `rafa release tag`) checks the tag out, runs the gates and then
+# `rafa release publish`, which runs `scripts/publish-package.ts` in the
+# folder of each package whose tag points at the commit, and skips a
+# version npm already holds. The script packs with `bun pm pack`, so the
+# published manifest carries real versions over `workspace:^`, and
+# refuses a tarball the pack check rejects.
+#
+# npm trusted publishing needs npm 11.5.1 or newer, `id-token: write` on
+# the job, and a trusted publisher on npmjs.com for each package, naming
+# this repository and this workflow file. npm attaches provenance on a
+# trusted publish, so no token and no flag are set here.
+#
+# The job runs only when the repository variable `RAFA_RELEASE_PUBLISH`
+# is `ci`; otherwise GitHub skips it, and a skipped job does not fail the
+# run. `gh variable set RAFA_RELEASE_PUBLISH --body ci` turns it on.
+#
+# A tag pushed with a workflow's GITHUB_TOKEN starts no other workflow
+# run, so a workflow that tags calls this one through `workflow_call`.
+name: Release publish
+
+on:
+  push:
+    tags: ['**']
+  workflow_call:
+    inputs:
+      ref:
+        description: The tag or commit to publish from.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: vars.RAFA_RELEASE_PUBLISH == 'ci'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - name: Set up node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm
+        run: npm install -g npm@latest && npm --version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Gates
+        run: bun run gates
+
+      # The checkout holds no rafa config: `.rafa/` is local to each clone.
+      - name: Write the CI config
+        shell: bash
+        run: |
+          mkdir -p .rafa
+          printf '%s\n' \
+            '# Written by the Release publish workflow.' \
+            'release:' \
+            '  enabled: true' \
+            '  publish: ci' \
+            '  publishCommand: bun ../../scripts/publish-package.ts' \
+            > .rafa/config.yaml
+
+      - name: Publish
+        shell: bash
+        run: |
+          bun install -g @open-tomato/rafa@0.47.0
+          export PATH="${BUN_INSTALL:-$HOME/.bun}/bin:$PATH"
+          rafa release publish
