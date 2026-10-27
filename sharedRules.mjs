@@ -17,9 +17,11 @@ export default {
   '@stylistic/quotes': ['error', 'single'],
   '@stylistic/semi': ['error', 'always'],
   'import/prefer-default-export': 0,
-  // The MCP SDK publishes its subpaths through a `./*` export pattern the
-  // import resolver does not follow; `tsc` (NodeNext) resolves them instead.
-  'import/no-unresolved': ['error', { ignore: ['^bun:', '^@modelcontextprotocol/sdk/'] }],
+  // Two kinds of import are left to `tsc`, which resolves them under
+  // NodeNext: the workspace's own packages, whose exports point at `dist/`
+  // and lint runs before any build; and the MCP SDK's subpaths, published
+  // through a `./*` export pattern the import resolver does not follow.
+  'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/service', '^@modelcontextprotocol/sdk/'] }],
   'import/order': ['error', {
     groups: [
       'type',
