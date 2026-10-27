@@ -56,6 +56,12 @@ export function applyMiddleware(
   app.use(pinoHttp({ logger: httpLogger, redact: REDACTED_HEADERS }));
 }
 
+/** The first status code of the server-error range. */
+const SERVER_ERROR_STATUS = 500;
+
+/** The only message a server error sends to the client. */
+const GENERIC_SERVER_ERROR = 'Internal Server Error';
+
 type HttpError = {
   status?: number;
   statusCode?: number;
@@ -71,10 +77,15 @@ type HttpError = {
  * ```
  *
  * Reads `err.status` or `err.statusCode` for the HTTP status; falls back to 500.
+ * A client error (4xx) answers with the error's message. A server error (5xx)
+ * answers with a fixed message, because its text can carry internal detail.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   const httpErr = err as HttpError;
   const status = httpErr.status ?? httpErr.statusCode ?? 500;
-  res.status(status).json({ error: httpErr.message ?? 'Internal Server Error' });
+  const message = status < SERVER_ERROR_STATUS
+    ? httpErr.message ?? GENERIC_SERVER_ERROR
+    : GENERIC_SERVER_ERROR;
+  res.status(status).json({ error: message });
 };
