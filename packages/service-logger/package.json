@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/service-logger",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Pino logger with header redaction, with Node.js and browser entry points",
   "license": "Apache-2.0",
   "author": "Marcos Tomatti",

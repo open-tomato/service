@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/service",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Framework-agnostic service core: dependency lifecycle, typed HTTP clients, retry and circuit breaking",
   "license": "Apache-2.0",
   "author": "Marcos Tomatti",
