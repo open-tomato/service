@@ -1,5 +1,7 @@
 import type { RequestHandler } from 'express';
 
+import { createHash, timingSafeEqual } from 'node:crypto';
+
 import { z } from 'zod';
 
 /**
@@ -17,6 +19,17 @@ const controlTokenSchema = z.preprocess(
 );
 
 /**
+ * Compares two tokens in constant time. Both are hashed first, so the
+ * buffers `timingSafeEqual` compares have the same length whatever the
+ * tokens' lengths, and the comparison reveals neither.
+ */
+function sameToken(given: string, expected: string): boolean {
+  const digest = (value: string): Buffer => createHash('sha256').update(value)
+    .digest();
+  return timingSafeEqual(digest(given), digest(expected));
+}
+
+/**
  * Express middleware that enforces shared-secret authentication for control
  * plane routes.
  *
@@ -24,13 +37,14 @@ const controlTokenSchema = z.preprocess(
  * Non-string header values (e.g. repeated headers parsed as arrays) are
  * treated as absent. Responds with HTTP 403 `{ error: 'forbidden' }` when the
  * header is absent or does not match. Calls `next()` when the token is valid.
+ * The comparison runs in constant time.
  *
  * @param secret - The expected token value. Must match `x-control-token` exactly.
  */
 export function controlAuth(secret: string): RequestHandler {
   return (req, res, next) => {
     const token = controlTokenSchema.parse(req.headers['x-control-token']);
-    if (token !== secret) {
+    if (token === undefined || !sameToken(token, secret)) {
       res.status(403).json({ error: 'forbidden' });
       return;
     }

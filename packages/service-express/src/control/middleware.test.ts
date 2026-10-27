@@ -1,8 +1,15 @@
 import type { NextFunction, Request, Response } from 'express';
 
+import { timingSafeEqual } from 'node:crypto';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import { controlAuth, controlEnabled } from './middleware.js';
+
+vi.mock('node:crypto', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:crypto')>();
+  return { ...actual, timingSafeEqual: vi.fn(actual.timingSafeEqual) };
+});
 
 function makeMocks() {
   const req = {} as Request;
@@ -48,6 +55,36 @@ describe('controlAuth', () => {
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.json).toHaveBeenCalledWith({ error: 'forbidden' });
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for a token of a different length, without throwing', () => {
+    const { req, res, next } = makeMocks();
+    (req as Request & { headers: Record<string, string> }).headers = {
+      'x-control-token': 'a-much-longer-token-than-the-secret',
+    };
+    controlAuth('secret')(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 for a token that differs only in its last character', () => {
+    const { req, res, next } = makeMocks();
+    (req as Request & { headers: Record<string, string> }).headers = {
+      'x-control-token': 'secreT',
+    };
+    controlAuth('secret')(req, res, next);
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('compares the token in constant time', () => {
+    vi.mocked(timingSafeEqual).mockClear();
+    const { req, res, next } = makeMocks();
+    (req as Request & { headers: Record<string, string> }).headers = {
+      'x-control-token': 'secret',
+    };
+    controlAuth('secret')(req, res, next);
+    expect(timingSafeEqual).toHaveBeenCalledTimes(1);
   });
 
   it('calls next() when x-control-token matches', () => {
