@@ -1,8 +1,9 @@
 /**
- * Publishes the package in the current folder: packs it with `bun pm pack`,
- * refuses a tarball the pack check rejects, and runs `npm publish` on the
- * tarball, so the published manifest carries the versions bun wrote over
- * `workspace:^`. A prerelease publishes under the `next` dist-tag.
+ * Publishes the package in the current folder: packs it as the pack check
+ * does (`./pack.ts`), with every `workspace:` range filled in from the
+ * sibling's own `package.json`, refuses a tarball the pack check rejects,
+ * and runs `npm publish` on the tarball. A prerelease publishes under the
+ * `next` dist-tag.
  *
  * `rafa release publish` runs it in each package's folder as
  * `release.publishCommand`: `bun ../../scripts/publish-package.ts`. Extra
@@ -18,7 +19,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { distTag, packPackage, readLegalFiles, tarballProblems } from './pack';
+import { distTag, packPackage, readLegalFiles, readWorkspaceVersions, tarballProblems } from './pack';
 
 /**
  * The `npm publish` command for a packed tarball.
@@ -63,9 +64,10 @@ async function runPassingStderr(command: readonly string[]): Promise<{ exitCode:
 if (import.meta.main) {
   const outDir = mkdtempSync(join(tmpdir(), 'publish-'));
   try {
-    const { path, packed } = packPackage(process.cwd(), outDir);
+    const versions = readWorkspaceVersions();
+    const { path, packed } = packPackage(process.cwd(), outDir, versions);
     const label = `${packed.manifest.name}@${packed.manifest.version}`;
-    const problems = tarballProblems(packed, readLegalFiles());
+    const problems = tarballProblems(packed, readLegalFiles(), versions);
     if (problems.length > 0) {
       problems.forEach((problem) => console.error(`${label}: ${problem}`));
       process.exitCode = 1;

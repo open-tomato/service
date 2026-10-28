@@ -1,12 +1,12 @@
 import type { PackedTarball } from './pack';
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
-import { distTag, exportTargets, packPackage, tarballProblems } from './pack';
+import { distTag, exportTargets, packPackage, resolveWorkspaceRanges, tarballProblems } from './pack';
 
 const LEGAL = { license: 'Apache License text', notice: 'NOTICE text' };
 
@@ -63,12 +63,49 @@ describe('tarballProblems', () => {
     expect(tarballProblems(packed, LEGAL)).toEqual(['exports dist/index.d.ts, which the tarball lacks']);
   });
 
+  test('names an internal range the workspace version does not satisfy', () => {
+    // The 1.0.0 release shipped `^0.0.0`: bun read the version from a stale bun.lock.
+    const packed = tarball({ manifest: { ...tarball().manifest, dependencies: { '@open-tomato/service-logger': '^0.0.0' } } });
+
+    expect(tarballProblems(packed, LEGAL, { '@open-tomato/service-logger': '1.0.0' })).toEqual([
+      'dependencies @open-tomato/service-logger is ^0.0.0, which 1.0.0 in this workspace does not satisfy',
+    ]);
+  });
+
+  test('passes an internal range the workspace version satisfies', () => {
+    expect(tarballProblems(tarball(), LEGAL, { '@open-tomato/service-logger': '1.0.1' })).toEqual([]);
+  });
+
   test('names a dependency still on the workspace protocol', () => {
     const packed = tarball({
       manifest: { ...tarball().manifest, peerDependencies: { '@open-tomato/service': 'workspace:^' } },
     });
 
     expect(tarballProblems(packed, LEGAL)).toEqual(['peerDependencies @open-tomato/service is workspace:^']);
+  });
+});
+
+describe('resolveWorkspaceRanges', () => {
+  const versions = { a: '1.2.3', b: '2.0.0', c: '3.1.0', d: '4.0.0' };
+
+  test('fills every workspace range in from the sibling version, leaving other ranges alone', () => {
+    const manifest = {
+      name: 'x',
+      dependencies: { a: 'workspace:^', b: 'workspace:~', zod: '^4.0.0' },
+      peerDependencies: { c: 'workspace:*', d: 'workspace:>=4' },
+    };
+
+    expect(resolveWorkspaceRanges(manifest, versions)).toEqual({
+      name: 'x',
+      dependencies: { a: '^1.2.3', b: '~2.0.0', zod: '^4.0.0' },
+      peerDependencies: { c: '3.1.0', d: '>=4' },
+    });
+    expect(manifest.dependencies.a).toBe('workspace:^');
+  });
+
+  test('refuses a workspace range for a package the workspace does not hold', () => {
+    expect(() => resolveWorkspaceRanges({ dependencies: { missing: 'workspace:^' } }, versions))
+      .toThrow('dependencies missing is workspace:^, and the workspace holds no package of that name');
   });
 });
 
@@ -130,5 +167,21 @@ describe('packPackage', () => {
     expect(packed.manifest.version).toBe('1.2.3');
     expect(packed.license).toBe(LEGAL.license);
     expect(packed.notice).toBe(LEGAL.notice);
+  });
+
+  test('packs workspace ranges as the sibling versions, and leaves the source manifest as it was', () => {
+    // Arrange
+    const pkg = join(dir, 'pkg');
+    mkdirSync(join(pkg, 'dist'), { recursive: true });
+    const manifest = { name: 'pack-fixture', version: '1.0.1', files: ['dist'], dependencies: { sibling: 'workspace:^' } };
+    writeFileSync(join(pkg, 'package.json'), JSON.stringify(manifest));
+    writeFileSync(join(pkg, 'dist', 'index.js'), 'export {};\n');
+
+    // Act
+    const { packed } = packPackage(pkg, join(dir, 'out'), { sibling: '1.0.1' });
+
+    // Assert
+    expect(packed.manifest.dependencies).toEqual({ sibling: '^1.0.1' });
+    expect(JSON.parse(readFileSync(join(pkg, 'package.json'), 'utf8'))).toEqual(manifest);
   });
 });
