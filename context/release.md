@@ -62,3 +62,16 @@ A package's first version is published from a maintainer's machine:
 npmjs.com, the package's settings get a trusted publisher naming
 `open-tomato/service` and `release-publish.yml`, and every later version
 publishes from CI.
+
+The trusted publisher's **Allowed actions** must include publishing
+directly with `npm publish`, because the workflow runs `npm publish`. An
+entry left at staging only answers `403 OIDC permission denied for this
+action`, after the provenance is already signed. npm cannot change an
+existing entry, so a wrong one is deleted and added again. An entry with
+no successful publish within 2 days expires.
+
+npm lists an accepted version a few minutes after the upload, and
+`npm view` cannot see it meanwhile. A run in that window uploads again
+and gets `409 previously staged version`, which the publish script reads
+as published. The 1.0.1 tags hit that: two runs started together, and
+each found the other's uploads still unlisted.
