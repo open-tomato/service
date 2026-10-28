@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/service-express",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Express adapter for @open-tomato/service: middleware, health and control routes, graceful shutdown",
   "license": "Apache-2.0",
   "author": "Marcos Tomatti",

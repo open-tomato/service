@@ -1,6 +1,6 @@
 {
   "name": "@open-tomato/service-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Model Context Protocol adapter for @open-tomato/service: server factory, transports and health endpoints",
   "license": "Apache-2.0",
   "author": "Marcos Tomatti",
