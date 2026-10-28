@@ -26,10 +26,7 @@
     },
     "packages/service": {
       "name": "@open-tomato/service",
-      "version": "0.0.0",
-      "dependencies": {
-        "@open-tomato/service-logger": "workspace:^",
-      },
+      "version": "1.0.2",
     },
     "packages/service-errors": {
       "name": "@open-tomato/service-errors",
@@ -44,9 +41,10 @@
     },
     "packages/service-express": {
       "name": "@open-tomato/service-express",
-      "version": "0.0.0",
+      "version": "1.0.2",
       "dependencies": {
         "@open-tomato/service": "workspace:^",
+        "@open-tomato/service-logger": "workspace:^",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.6",
         "express": "^5.3.0",
@@ -66,7 +64,7 @@
     },
     "packages/service-logger": {
       "name": "@open-tomato/service-logger",
-      "version": "0.0.0",
+      "version": "1.0.1",
       "dependencies": {
         "pino": "^10.4.0",
         "pino-http": "^11.0.0",
@@ -75,7 +73,7 @@
     },
     "packages/service-mcp": {
       "name": "@open-tomato/service-mcp",
-      "version": "0.0.0",
+      "version": "1.0.2",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.32.2",
         "@open-tomato/service": "workspace:^",

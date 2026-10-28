@@ -33,7 +33,5 @@
     "check-types": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {
-    "@open-tomato/service-logger": "workspace:^"
-  }
+  "sideEffects": false
 }

@@ -1,5 +1,5 @@
 import type { ResolvedServiceConfig } from './schema.js';
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 import type { Application, ErrorRequestHandler } from 'express';
 
 import cookieParser from 'cookie-parser';
@@ -37,7 +37,7 @@ const REDACTED_HEADERS = [
 export function applyMiddleware(
   app: Application,
   config: ResolvedServiceConfig,
-  logger: ServiceLogger,
+  logger: Logger,
 ): void {
   logger.debug({ serviceId: config.serviceId }, 'applying middleware');
   const httpLogger = pino({ name: config.serviceId });

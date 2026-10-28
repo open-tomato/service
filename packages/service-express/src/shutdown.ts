@@ -1,4 +1,4 @@
-import type { Dependency, ServiceLogger } from '@open-tomato/service';
+import type { Dependency, Logger } from '@open-tomato/service';
 import type { Server } from 'http';
 
 /**
@@ -19,7 +19,7 @@ import type { Server } from 'http';
 export async function gracefulStop(
   server: Server,
   dependencies: Dependency[],
-  logger: ServiceLogger,
+  logger: Logger,
   drainTimeout = 10_000,
 ): Promise<void> {
   logger.info('shutdown: stopping new connections');
@@ -59,7 +59,7 @@ export async function gracefulStop(
 export function registerShutdown(
   server: Server,
   dependencies: Dependency[],
-  logger: ServiceLogger,
+  logger: Logger,
   drainTimeout: number,
 ): void {
   let shutting = false;

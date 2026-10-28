@@ -67,7 +67,6 @@ describe('MCPContext', () => {
         warn: () => {},
         error: () => {},
         fatal: () => {},
-        level: 'info',
         child: () => ({}) as never,
       },
       clients: fakeClients,

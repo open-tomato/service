@@ -1,5 +1,5 @@
 import type { ResolvedServiceConfig } from './schema.js';
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 
 import express from 'express';
 import request from 'supertest';
@@ -12,7 +12,7 @@ const TOKEN = 'token-value-123';
 const COOKIE = 'cookie-value-456';
 const API_KEY = 'api-key-value-789';
 
-const logger = { debug: vi.fn() } as unknown as ServiceLogger;
+const logger = { debug: vi.fn() } as unknown as Logger;
 
 describe('applyMiddleware — request logging', () => {
   let written: string[];

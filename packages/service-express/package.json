@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@open-tomato/service": "workspace:^",
+    "@open-tomato/service-logger": "workspace:^",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "express": "^5.3.0",

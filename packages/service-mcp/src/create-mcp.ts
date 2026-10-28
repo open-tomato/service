@@ -4,7 +4,7 @@ import type { ClientsMap, TypedClient } from '@open-tomato/service';
 import process from 'node:process';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { createServiceLogger } from '@open-tomato/service';
+import { createLogger } from '@open-tomato/service-logger';
 
 import { startHealthServer } from './health.js';
 import { MCPConfigSchema } from './schema.js';
@@ -104,7 +104,7 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  */
 export function createMCP(config: MCPConfig): MCPHandle {
   const resolved = MCPConfigSchema.parse(config);
-  const logger = createServiceLogger(resolved.serviceId, resolved.logger);
+  const logger = createLogger(resolved.serviceId, resolved.logger);
   const clientsMap = buildClientsMap(resolved.clients);
   const server = new McpServer({ name: resolved.serviceId, version: '1.0.0' });
 

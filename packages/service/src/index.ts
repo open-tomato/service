@@ -8,6 +8,6 @@ export { createHttpClient } from './http-client.js';
 export { CircuitOpenError } from './circuit-breaker.js';
 export type { TypedClient, ClientsMap, HttpClientOpts, RetryConfig, CircuitBreakerConfig } from './types.js';
 
-export { createServiceLogger } from './logger.js';
-export type { Logger, LoggerOptions, ServiceLogger } from './logger.js';
+export { createConsoleLogger } from './logger.js';
+export type { ConsoleLoggerOptions, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';

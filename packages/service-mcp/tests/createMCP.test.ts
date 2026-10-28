@@ -34,8 +34,8 @@ vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
   return { McpServer };
 });
 
-vi.mock('@open-tomato/service', () => ({
-  createServiceLogger: vi.fn().mockReturnValue(mocks.mockLogger),
+vi.mock('@open-tomato/service-logger', () => ({
+  createLogger: vi.fn().mockReturnValue(mocks.mockLogger),
 }));
 
 vi.mock('../src/transport.js', () => ({

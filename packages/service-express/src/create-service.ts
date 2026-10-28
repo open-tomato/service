@@ -3,7 +3,7 @@ import type { ServiceHandle, ServiceContext } from './types.js';
 import type { TypedClient } from '@open-tomato/service';
 import type { Server } from 'http';
 
-import { createServiceLogger } from '@open-tomato/service';
+import { createLogger } from '@open-tomato/service-logger';
 import express from 'express';
 
 import { buildRequireAuth, buildOptionalAuth, passthroughMiddleware } from './auth.js';
@@ -52,7 +52,7 @@ import { gracefulStop, registerShutdown } from './shutdown.js';
  */
 export async function createService(config: ServiceConfig): Promise<ServiceHandle> {
   const resolved = ServiceConfigSchema.parse(config);
-  const logger = createServiceLogger(resolved.serviceId);
+  const logger = createLogger(resolved.serviceId);
 
   // 1. Start dependencies — abort on first failure
   for (const dep of resolved.dependencies) {

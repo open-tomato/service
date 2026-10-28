@@ -103,6 +103,30 @@ try {
 | `circuitBreaker.threshold` | `5` | consecutive failures that open the breaker |
 | `circuitBreaker.timeout` | `30000` | milliseconds before an open breaker lets a probe through |
 
+## Logging
+
+The core writes through a `Logger`: the part of pino's API the stack uses.
+A pino logger fits it, and so does one from
+[`@open-tomato/service-logger`](https://www.npmjs.com/package/@open-tomato/service-logger),
+which is what the adapters create. For code that runs without an
+adapter, `createConsoleLogger` needs no dependency and runs anywhere a
+`console` exists.
+
+```ts
+import { createConsoleLogger } from '@open-tomato/service';
+
+const logger = createConsoleLogger('orders', { level: 'debug' });
+
+logger.info({ orderId: 'o-1' }, 'order created');
+// console.info('order created', { level: 'info', service: 'orders', orderId: 'o-1' })
+
+logger.child({ requestId: 'r-9' }).warn('slow upstream');
+```
+
+The level comes from `options.level`, then `LOG_LEVEL`, then `info`. An
+`Error` passed as the first argument lands under `err`, so its message and
+stack survive.
+
 ## Exports
 
 | Export | What it is |
@@ -110,7 +134,8 @@ try {
 | `createDependency(opts)` | a `Dependency`, or a `TypedDependency<T>` when `opts.client` is given |
 | `createHttpClient(client, opts?)` | the client with retry and a circuit breaker, plus the `Dependency` lifecycle |
 | `CircuitOpenError` | thrown by a client call while its breaker is open |
-| `createServiceLogger(serviceId, options?)` | a pino logger bound to `serviceId`, from [`@open-tomato/service-logger`](https://www.npmjs.com/package/@open-tomato/service-logger) |
+| `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
+| `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |
 
 ## Requirements
