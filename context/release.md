@@ -14,6 +14,8 @@ Each public package versions on its own and publishes to npmjs under the
   is done. Before 2.0.0 releases, `main` merges into `v2`, so every 1.x
   fix carries over. A prerelease such as `2.0.0-next.1` publishes under
   the `next` dist-tag and never becomes `latest`.
+  Pull requests for 2.0 go into `v2`, where CI runs the same gates as
+  on `main`.
 
 ## Steps
 
