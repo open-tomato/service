@@ -3,6 +3,7 @@ import type { CircuitState } from './index.js';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { CircuitBreaker } from './circuit-breaker.js';
+import * as control from './control.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
@@ -25,6 +26,16 @@ describe('public exports', () => {
 
   it('exports createRuntime', () => {
     expect(core.createRuntime).toBe(createRuntime);
+  });
+
+  it('exports the control operations', () => {
+    expect(core.controlStatus).toBe(control.controlStatus);
+    expect(core.listDependencies).toBe(control.listDependencies);
+    expect(core.pauseDependency).toBe(control.pauseDependency);
+    expect(core.resumeDependency).toBe(control.resumeDependency);
+    expect(core.restartDependency).toBe(control.restartDependency);
+    expect(core.resetClient).toBe(control.resetClient);
+    expect(core.verifyControlToken).toBe(control.verifyControlToken);
   });
 
   it('exports the CircuitState type', () => {

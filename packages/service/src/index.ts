@@ -13,6 +13,25 @@ export type { TypedClient, ClientsMap, HttpClientOpts, RetryConfig, CircuitBreak
 export { createRuntime } from './runtime.js';
 export type { DependencyRecord, Runtime, RuntimeOptions, RuntimeState, StopResult } from './runtime.js';
 
+export {
+  controlStatus,
+  listDependencies,
+  pauseDependency,
+  resetClient,
+  restartDependency,
+  resumeDependency,
+  verifyControlToken,
+} from './control.js';
+export type {
+  ClientControlStatus,
+  ControlActionBody,
+  ControlResult,
+  ControlStatusBody,
+  ControlStatusOptions,
+  ControlTarget,
+  DependencyControlStatus,
+} from './control.js';
+
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 

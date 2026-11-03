@@ -183,6 +183,38 @@ Before start, a stopped dependency counts as degraded, so a service that
 starts on its first request still answers 200 to the probe that lets that
 request through.
 
+## Control
+
+The control operations are plain functions over a runtime. Each returns a
+`{ code, body }` pair, so an adapter only maps it onto its transport.
+
+```ts
+import { controlStatus, createRuntime, verifyControlToken } from '@open-tomato/service';
+
+const secret = 'configured-secret';
+const sent = 'configured-secret'; // the x-control-token header, in an adapter
+const runtime = createRuntime({ serviceId: 'orders' });
+const startedAt = Date.now();
+await runtime.ensureStarted();
+
+if (await verifyControlToken(sent, secret)) {
+  const { code, body } = controlStatus(runtime, { version: '2.0.0', startedAt });
+  console.log(code, body.status); // 200 'ok'
+}
+```
+
+- `controlStatus(runtime, { version, startedAt })`: the overall health,
+  uptime, version, and each dependency and client. Always 200.
+- `listDependencies(runtime)`: each dependency's name, status and health
+  detail.
+- `pauseDependency`, `resumeDependency`, `restartDependency` and
+  `resetClient`, each `(runtime, name)`: 200 `{ ok: true }`, 400 for an
+  empty name or a missing `pause`/`resume`, 404 for an unknown name, 500
+  `{ error }` when the dependency throws.
+- `verifyControlToken(given, expected)`: compares a token in constant
+  time through WebCrypto. A non-string token or an empty secret is
+  rejected.
+
 ## Logging
 
 The core writes through a `Logger`: the part of pino's API the stack uses.
@@ -218,6 +250,9 @@ stack survive.
 | `CircuitOpenError` | thrown by a breaker's call while it is open |
 | `createRuntime(options)` | the runtime that starts, stops and reports on a service's dependencies and clients |
 | `Runtime`, `RuntimeOptions`, `RuntimeState`, `StopResult`, `DependencyRecord` | the runtime's types |
+| `controlStatus`, `listDependencies`, `pauseDependency`, `resumeDependency`, `restartDependency`, `resetClient` | the control operations, each returning `{ code, body }` |
+| `verifyControlToken(given, expected)` | the control token check, constant time, on WebCrypto |
+| `ControlResult`, `ControlActionBody`, `ControlStatusBody`, `ControlStatusOptions`, `ControlTarget`, `DependencyControlStatus`, `ClientControlStatus` | the control operations' types |
 | `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
 | `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
