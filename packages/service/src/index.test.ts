@@ -5,6 +5,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { CircuitBreaker } from './circuit-breaker.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 import { withRetry } from './retry.js';
+import { createRuntime } from './runtime.js';
 
 import * as core from './index.js';
 
@@ -20,6 +21,10 @@ describe('public exports', () => {
   it('exports aggregateHealth and HEALTH_HTTP_STATUS', () => {
     expect(core.aggregateHealth).toBe(aggregateHealth);
     expect(core.HEALTH_HTTP_STATUS).toBe(HEALTH_HTTP_STATUS);
+  });
+
+  it('exports createRuntime', () => {
+    expect(core.createRuntime).toBe(createRuntime);
   });
 
   it('exports the CircuitState type', () => {

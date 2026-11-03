@@ -13,8 +13,9 @@ stack. It gives a TypeScript service the parts every service needs:
 - **Typed HTTP clients.** Wrap any client object, and every method call on it
   retries with backoff and goes through a circuit breaker, with the client's
   own types kept.
-- **One shape for all of them**, so an adapter can start them in order, stop
-  them in reverse and report their health.
+- **A runtime** that starts them in order, undoes a start that fails part
+  way, stops them in reverse and reports their health, the same way under
+  every adapter.
 
 Use it through an adapter: [`@open-tomato/service-express`](https://www.npmjs.com/package/@open-tomato/service-express)
 for an HTTP service, or [`@open-tomato/service-mcp`](https://www.npmjs.com/package/@open-tomato/service-mcp)
@@ -105,6 +106,50 @@ try {
 | `circuitBreaker.threshold` | `5` | consecutive failures that open the breaker |
 | `circuitBreaker.timeout` | `30000` | milliseconds before an open breaker lets a probe through |
 
+## A runtime
+
+`createRuntime` takes a service's dependencies and clients as named
+records and starts and stops them as one. Each comes back under its key,
+with its own type.
+
+```ts
+import { createDependency, createHttpClient, createRuntime } from '@open-tomato/service';
+
+class InventoryApi {
+  async stock(sku: string): Promise<number> { return sku.length; }
+}
+
+const runtime = createRuntime({
+  serviceId: 'orders',
+  dependencies: {
+    cache: createDependency({ name: 'cache', client: new Map<string, string>() }),
+  },
+  clients: {
+    inventory: createHttpClient(new InventoryApi(), { name: 'inventory' }),
+  },
+});
+
+await runtime.ensureStarted();
+runtime.deps.cache.client.set('greeting', 'hello'); // typed as Map<string, string>
+await runtime.clients.inventory.stock('sku-42');
+console.log(runtime.health()); // { status: 'ok', dependencies: { cache: 'running', inventory: 'running' } }
+
+console.log(await runtime.stop()); // { stopped: ['inventory', 'cache'], failed: [], timedOut: [] }
+```
+
+- **Order.** Dependencies start in key order, then clients; `stop()`
+  stops them in reverse.
+- **One start.** `ensureStarted()` starts once: calls made during a start
+  share it, and a call once running resolves at once. If a dependency
+  fails, the ones already started are stopped in reverse, the call rejects
+  with that error, and the next call tries again.
+- **A stop that always finishes.** `stop()` never rejects. Each
+  dependency gets `stopTimeoutMs` (10 000 by default); one that fails or
+  outlasts it is reported, and the rest still stop.
+- **Names.** Health reports and logs use each dependency's own `name`,
+  which must be unique across dependencies and clients; `createRuntime`
+  throws a `TypeError` otherwise.
+
 ## Health
 
 `aggregateHealth` folds the statuses of a service's dependencies and
@@ -171,6 +216,8 @@ stack survive.
 | `withRetry(fn, config?)` | runs `fn` with the same retry policy, for a call that is not a client method |
 | `CircuitBreaker`, `CircuitState` | the breaker a client uses, for wrapping any async call; its state is `'closed'`, `'open'` or `'half-open'` |
 | `CircuitOpenError` | thrown by a breaker's call while it is open |
+| `createRuntime(options)` | the runtime that starts, stops and reports on a service's dependencies and clients |
+| `Runtime`, `RuntimeOptions`, `RuntimeState`, `StopResult`, `DependencyRecord` | the runtime's types |
 | `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
 | `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
