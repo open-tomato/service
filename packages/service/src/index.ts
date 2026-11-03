@@ -32,6 +32,9 @@ export type {
   DependencyControlStatus,
 } from './control.js';
 
+export { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
+export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from './schema.js';
+
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 

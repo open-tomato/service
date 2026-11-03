@@ -215,6 +215,39 @@ if (await verifyControlToken(sent, secret)) {
   time through WebCrypto. A non-string token or an empty secret is
   rejected.
 
+## Config
+
+`BaseServiceConfigSchema` is the config every adapter shares, written with
+[zod](https://zod.dev). An adapter, or a service, adds its own fields with
+`.extend()`, so the shared fields are checked the same way everywhere.
+
+```ts
+import { z } from 'zod';
+
+import { BaseServiceConfigSchema, createDependency } from '@open-tomato/service';
+
+const ServiceConfigSchema = BaseServiceConfigSchema.extend({
+  port: z.number().default(3000),
+});
+
+const config = ServiceConfigSchema.parse({
+  serviceId: 'orders',
+  dependencies: { cache: createDependency({ name: 'cache' }) },
+});
+console.log(config.port, config.version); // 3000 'unknown'
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `serviceId` | required | the service's name; non-blank |
+| `version` | `'unknown'` | the version `controlStatus` reports |
+| `dependencies`, `clients` | `{}` | records of `Dependency` objects by key, as `createRuntime` takes them; a 1.x array is rejected |
+| `control` | none | `{ enabled, secret }`; the secret must be non-empty while `enabled` is true |
+| `stopTimeoutMs` | none, so `createRuntime` uses 10 000 | milliseconds each dependency gets to stop; 0 or more |
+
+zod is the core's one dependency. It has no Node-only code, so the core
+still runs on the web-standard globals alone.
+
 ## Logging
 
 The core writes through a `Logger`: the part of pino's API the stack uses.
@@ -255,6 +288,8 @@ stack survive.
 | `ControlResult`, `ControlActionBody`, `ControlStatusBody`, `ControlStatusOptions`, `ControlTarget`, `DependencyControlStatus`, `ClientControlStatus` | the control operations' types |
 | `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
 | `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
+| `BaseServiceConfigSchema`, `ControlConfigSchema` | the zod schemas for the shared config and its `control` field |
+| `BaseServiceConfig`, `ResolvedBaseServiceConfig`, `ControlConfig` | the config as written, the config once parsed, and the `control` field |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
 | `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |

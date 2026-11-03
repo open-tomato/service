@@ -27,6 +27,9 @@
     "packages/service": {
       "name": "@open-tomato/service",
       "version": "1.0.2",
+      "dependencies": {
+        "zod": "^4.6.7",
+      },
     },
     "packages/service-errors": {
       "name": "@open-tomato/service-errors",

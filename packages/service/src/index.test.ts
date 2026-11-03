@@ -7,6 +7,7 @@ import * as control from './control.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
+import { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
 
 import * as core from './index.js';
 
@@ -36,6 +37,11 @@ describe('public exports', () => {
     expect(core.restartDependency).toBe(control.restartDependency);
     expect(core.resetClient).toBe(control.resetClient);
     expect(core.verifyControlToken).toBe(control.verifyControlToken);
+  });
+
+  it('exports the base config schema and the control config schema', () => {
+    expect(core.BaseServiceConfigSchema).toBe(BaseServiceConfigSchema);
+    expect(core.ControlConfigSchema).toBe(ControlConfigSchema);
   });
 
   it('exports the CircuitState type', () => {

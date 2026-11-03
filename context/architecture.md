@@ -26,7 +26,7 @@ This table shows each concern's home today and where it is moving.
 | Circuit breaker | core, `CircuitBreaker` exported | core |
 | Logging | core takes an injected `Logger`, console by default | core |
 | Errors | `service-errors` | error classes in core, the HTTP handler in the Express adapter |
-| Config contracts | one schema per adapter | a base schema in core that adapters extend |
+| Config contracts | core `BaseServiceConfigSchema`; each adapter still has its own schema | the base schema, extended by each adapter |
 | OpenAPI | not built | core describes the routes, adapters render the document |
 
 ## Keeping the core portable
@@ -42,6 +42,9 @@ line:
 - **check-types** also compiles the sources with `tsconfig.build.json`,
   which has no Node types and the `ES2023` and `WebWorker` libraries, so
   the same code fails to type-check.
+
+The core's one dependency is zod, for the base config schema, and zod has
+no Node-only code.
 
 There is no runtime check. vitest's `edge-runtime` environment keeps Node's
 `process`, `Buffer`, `require` and `setImmediate` in place, so a test run
