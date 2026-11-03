@@ -184,6 +184,7 @@ export interface DepsMap {
  * @example
  * ```ts
  * const apiClient: TypedClient<MyApiSdk> = createHttpClient(new MyApiSdk(), {
+ *   name: 'my-api',
  *   retry: { attempts: 3, backoff: 'exponential', jitter: true },
  * });
  *
@@ -209,8 +210,8 @@ export type TypedClient<T> = T & Dependency;
  * @example
  * ```ts
  * const clients: ClientsMap = {
- *   payments: createHttpClient(new PaymentsApiSdk(), { ... }),
- *   notifications: createHttpClient(new NotificationsApiSdk(), { ... }),
+ *   payments: createHttpClient(new PaymentsApiSdk(), { name: 'payments' }),
+ *   notifications: createHttpClient(new NotificationsApiSdk(), { name: 'notifications' }),
  * };
  *
  * await Promise.all(Object.values(clients).map(c => c.start()));
@@ -328,16 +329,18 @@ export interface ServicePlugin<TContext = unknown> {
 }
 
 /**
- * Options accepted by `createHttpClient` to configure per-client resilience
- * behaviour.
+ * Options accepted by `createHttpClient`: the client's name, and its
+ * per-client resilience behaviour.
  *
- * Both fields are optional. When omitted, safe defaults are applied:
+ * `name` is required. The resilience fields are optional, and safe defaults
+ * apply when they are omitted:
  * - `retry`: 3 attempts with exponential backoff and no jitter
  * - `circuitBreaker`: threshold 5 / timeout 30 s
  *
  * @example
  * ```ts
  * const opts: HttpClientOpts = {
+ *   name: 'inventory',
  *   retry: { attempts: 5, backoff: 'exponential', jitter: true },
  *   circuitBreaker: { threshold: 3, timeout: 10_000 },
  * };
@@ -345,6 +348,12 @@ export interface ServicePlugin<TContext = unknown> {
  * ```
  */
 export interface HttpClientOpts {
+  /**
+   * The client's name: its `Dependency` name, which health reports and logs
+   * show. Must be non-empty, and unique among a service's clients.
+   */
+  name: string;
+
   /**
    * Retry configuration applied to every proxied method call.
    * Omit to use the default 3-attempt exponential-backoff policy.

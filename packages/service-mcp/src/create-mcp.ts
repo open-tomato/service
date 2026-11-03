@@ -86,7 +86,7 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  *
  * @example With an HTTP client
  * ```ts
- * const github = createHttpClient(new GitHubApi(), { retry: { attempts: 2 } });
+ * const github = createHttpClient(new GitHubApi(), { name: 'github', retry: { attempts: 2 } });
  *
  * const handle = createMCP({
  *   serviceId: 'context-generator',

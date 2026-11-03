@@ -80,6 +80,7 @@ class InventoryApi {
 }
 
 const inventory = createHttpClient(new InventoryApi(), {
+  name: 'inventory',
   retry: { attempts: 3, backoff: 'exponential', jitter: true },
   circuitBreaker: { threshold: 5, timeout: 30_000 },
 });
@@ -97,6 +98,7 @@ try {
 
 | Option | Default | Meaning |
 |---|---|---|
+| `name` | required | the client's name, shown in health reports and logs; non-empty |
 | `retry.attempts` | `3` | calls in total, the first one included |
 | `retry.backoff` | `'exponential'` | `'exponential'` doubles the wait, `'linear'` keeps it constant |
 | `retry.jitter` | `false` | adds a random part to each wait |
@@ -132,8 +134,10 @@ stack survive.
 | Export | What it is |
 |---|---|
 | `createDependency(opts)` | a `Dependency`, or a `TypedDependency<T>` when `opts.client` is given |
-| `createHttpClient(client, opts?)` | the client with retry and a circuit breaker, plus the `Dependency` lifecycle |
-| `CircuitOpenError` | thrown by a client call while its breaker is open |
+| `createHttpClient(client, opts)` | the client with retry and a circuit breaker, plus the `Dependency` lifecycle; `opts.name` is required |
+| `withRetry(fn, config?)` | runs `fn` with the same retry policy, for a call that is not a client method |
+| `CircuitBreaker`, `CircuitState` | the breaker a client uses, for wrapping any async call; its state is `'closed'`, `'open'` or `'half-open'` |
+| `CircuitOpenError` | thrown by a breaker's call while it is open |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
 | `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |

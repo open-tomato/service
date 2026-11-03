@@ -55,7 +55,7 @@ export interface ServiceContext {
  *
  * @example
  * ```ts
- * const api = createHttpClient(new MyApiSdk(), { retry: { attempts: 3 } })
+ * const api = createHttpClient(new MyApiSdk(), { name: 'my-api', retry: { attempts: 3 } })
  *
  * await createService({
  *   clients: [api],

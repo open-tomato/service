@@ -21,9 +21,9 @@ This table shows each concern's home today and where it is moving.
 | Service runtime: start in order, stop in reverse | Express adapter only | core `createRuntime`, used by every adapter |
 | Health aggregation | one rule per adapter | one core function |
 | Control operations: status, pause, resume, restart | Express adapter | core; the HTTP routes stay in the adapter |
-| Typed HTTP clients | core, `createHttpClient` | core |
-| Retry with exponential backoff | core, not exported | core, exported |
-| Circuit breaker | core, only `CircuitOpenError` exported | core, exported |
+| Typed HTTP clients | core, `createHttpClient`, named by the caller | core |
+| Retry with exponential backoff | core, `withRetry` exported | core |
+| Circuit breaker | core, `CircuitBreaker` exported | core |
 | Logging | core takes an injected `Logger`, console by default | core |
 | Errors | `service-errors` | error classes in core, the HTTP handler in the Express adapter |
 | Config contracts | one schema per adapter | a base schema in core that adapters extend |

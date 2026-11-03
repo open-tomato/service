@@ -60,7 +60,7 @@ class NotesApi {
   }
 }
 
-const notesApi = createHttpClient(new NotesApi(), { retry: { attempts: 3 } });
+const notesApi = createHttpClient(new NotesApi(), { name: 'notes-api', retry: { attempts: 3 } });
 
 const handle = createMCP({
   serviceId: 'notes',

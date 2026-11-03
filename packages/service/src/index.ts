@@ -5,7 +5,9 @@ export type { CreateDependencyOpts, CreateTypedDependencyOpts } from './dependen
 export type { Dependency, DependencyStatus, TypedDependency, InferInstance, DepsMap } from './types.js';
 
 export { createHttpClient } from './http-client.js';
-export { CircuitOpenError } from './circuit-breaker.js';
+export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
+export type { CircuitState } from './circuit-breaker.js';
+export { withRetry } from './retry.js';
 export type { TypedClient, ClientsMap, HttpClientOpts, RetryConfig, CircuitBreakerConfig } from './types.js';
 
 export { createConsoleLogger } from './logger.js';

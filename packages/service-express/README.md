@@ -59,7 +59,7 @@ class InventoryApi {
   }
 }
 
-const inventory = createHttpClient(new InventoryApi(), { retry: { attempts: 3 } });
+const inventory = createHttpClient(new InventoryApi(), { name: 'inventory', retry: { attempts: 3 } });
 
 await createService({
   serviceId: 'orders',
