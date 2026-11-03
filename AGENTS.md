@@ -24,8 +24,10 @@ concern lives today, and what is moving.
 
 `bun run gates` runs lint, check-types, test, test-scripts, build, pack
 and check-node, in that order, and stops at the first failure. Test files are
-type-checked too. `context/verification.md` says what each gate proves and
-how to run one scoped to a change.
+type-checked too. lint and check-types also keep the core free of Node-only
+imports and globals; `context/architecture.md` has the rule.
+`context/verification.md` says what each gate proves and how to run one
+scoped to a change.
 
 ## Docs: the shadow tree
 

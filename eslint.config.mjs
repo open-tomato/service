@@ -1,3 +1,5 @@
+import { builtinModules } from 'node:module';
+
 import eslint from '@eslint/js';
 import markdown from '@eslint/markdown';
 import stylistic from '@stylistic/eslint-plugin';
@@ -12,6 +14,23 @@ import { configs as tsLintConfig } from 'typescript-eslint';
 import sharedRules from './sharedRules.mjs';
 
 const fenceProcessor = markdown.processors.markdown;
+
+/** Node's built-in module names without a subpath, as one regex alternation. */
+const NODE_BUILTINS = builtinModules.filter((name) => !name.includes('/')).join('|');
+
+/** Node globals the core must not read, because other runtimes lack them. */
+const NODE_ONLY_GLOBALS = [
+  'process',
+  'Buffer',
+  'require',
+  'module',
+  'exports',
+  '__dirname',
+  '__filename',
+  'global',
+  'setImmediate',
+  'clearImmediate',
+];
 
 /**
  * The `markdown/markdown` processor, extended to lint the Markdown file
@@ -90,6 +109,32 @@ export default defineConfig([
           noWarnOnMultipleProjects: true,
         },
       },
+    },
+  },
+  {
+    // The core's portability guard: `@open-tomato/service` runs outside
+    // Node (Workers, Deno, a browser bundle), so its sources import no Node
+    // built-in and read no Node-only global. Environment variables go
+    // through `readEnv()`. Tests run under Node and are not held to it.
+    files: ['packages/service/src/**/*.ts'],
+    ignores: ['packages/service/src/**/*.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            regex: `^(node:|(${NODE_BUILTINS})(/|$))`,
+            message: 'The core runs outside Node: use a web-standard API, or keep this in an adapter.',
+          },
+          {
+            regex: '^(pino|@open-tomato/service-logger)(/|$)',
+            message: 'The core logs through its injected Logger; pino stays in the adapters.',
+          },
+        ],
+      }],
+      'no-restricted-globals': ['error', ...NODE_ONLY_GLOBALS.map((name) => ({
+        name,
+        message: `The core runs outside Node, where \`${name}\` may not exist; read env through readEnv(), and keep the rest in an adapter.`,
+      }))],
     },
   },
   {

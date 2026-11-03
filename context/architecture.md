@@ -24,10 +24,28 @@ This table shows each concern's home today and where it is moving.
 | Typed HTTP clients | core, `createHttpClient` | core |
 | Retry with exponential backoff | core, not exported | core, exported |
 | Circuit breaker | core, only `CircuitOpenError` exported | core, exported |
-| Logging | core builds a pino logger through `service-logger` | core takes an injected logger |
+| Logging | core takes an injected `Logger`, console by default | core |
 | Errors | `service-errors` | error classes in core, the HTTP handler in the Express adapter |
 | Config contracts | one schema per adapter | a base schema in core that adapters extend |
 | OpenAPI | not built | core describes the routes, adapters render the document |
+
+## Keeping the core portable
+
+The core's sources (`packages/service/src`, tests aside) use web-standard
+globals only, so the core can run where Node does not. Two gates hold that
+line:
+
+- **lint** rejects an import of a Node built-in (`node:*` or a bare name
+  such as `fs`), pino or `service-logger`, and a read of a Node-only global
+  such as `process` or `Buffer`. Environment variables go through
+  `readEnv()`, which reads `globalThis.process` only where it exists.
+- **check-types** also compiles the sources with `tsconfig.build.json`,
+  which has no Node types and the `ES2023` and `WebWorker` libraries, so
+  the same code fails to type-check.
+
+There is no runtime check. vitest's `edge-runtime` environment keeps Node's
+`process`, `Buffer`, `require` and `setImmediate` in place, so a test run
+there passes code that reads them.
 
 ## Framework fit
 
@@ -39,7 +57,7 @@ This table shows each concern's home today and where it is moving.
   work in route handlers. A route starts its dependencies on first use,
   since there is no process to start them at boot, and breaker state lives
   per instance. The edge runtime needs the core free of Node-only modules,
-  which the injected logger provides.
+  which the injected logger and the portability guard provide.
 
 ## Known limits
 

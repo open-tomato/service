@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "build: JS and declarations for the published src; tests excluded",
+  "display": "build: JS and declarations for the published src, checked against web-standard globals only (no Node types), so the core stays portable; tests excluded",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": false,
@@ -8,7 +8,9 @@
     "declarationMap": false,
     "sourceMap": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "lib": ["ES2023", "WebWorker"],
+    "types": []
   },
   "include": ["src"],
   "exclude": ["src/**/*.test.ts", "src/**/__tests__/**"]
