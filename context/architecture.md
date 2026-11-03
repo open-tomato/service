@@ -19,7 +19,7 @@ This table shows each concern's home today and where it is moving.
 |---|---|---|
 | Dependency lifecycle: start, stop, pause, resume | core, `createDependency` | core |
 | Service runtime: start in order, stop in reverse | Express adapter only | core `createRuntime`, used by every adapter |
-| Health aggregation | one rule per adapter | one core function |
+| Health aggregation | core `aggregateHealth`; each adapter still has its own rule | the core function, used by every adapter |
 | Control operations: status, pause, resume, restart | Express adapter | core; the HTTP routes stay in the adapter |
 | Typed HTTP clients | core, `createHttpClient`, named by the caller | core |
 | Retry with exponential backoff | core, `withRetry` exported | core |

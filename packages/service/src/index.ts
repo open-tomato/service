@@ -10,6 +10,9 @@ export type { CircuitState } from './circuit-breaker.js';
 export { withRetry } from './retry.js';
 export type { TypedClient, ClientsMap, HttpClientOpts, RetryConfig, CircuitBreakerConfig } from './types.js';
 
+export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
+export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
+
 export { createConsoleLogger } from './logger.js';
 export type { ConsoleLoggerOptions, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';

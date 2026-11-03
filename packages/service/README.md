@@ -105,6 +105,39 @@ try {
 | `circuitBreaker.threshold` | `5` | consecutive failures that open the breaker |
 | `circuitBreaker.timeout` | `30000` | milliseconds before an open breaker lets a probe through |
 
+## Health
+
+`aggregateHealth` folds the statuses of a service's dependencies and
+clients into one report, the rule every adapter's health route answers
+with. Anything with a `name` and a `status` fits, so dependencies and
+clients go in as they are. `HEALTH_HTTP_STATUS` maps the overall status to
+200 or 503.
+
+```ts
+import { aggregateHealth, HEALTH_HTTP_STATUS } from '@open-tomato/service';
+
+const report = aggregateHealth([
+  { name: 'db', status: 'running' },
+  { name: 'inventory', status: 'degraded' },
+], { started: true });
+// { status: 'degraded', dependencies: { db: 'running', inventory: 'degraded' } }
+
+console.log(HEALTH_HTTP_STATUS[report.status]); // 200
+```
+
+The overall status is the worst one any dependency gives:
+
+| Dependency status | Before start | After start |
+|---|---|---|
+| `running` | `ok` (200) | `ok` (200) |
+| `starting`, `degraded`, `paused` | `degraded` (200) | `degraded` (200) |
+| `stopped`, `stopping` | `degraded` (200) | `error` (503) |
+| `error` | `error` (503) | `error` (503) |
+
+Before start, a stopped dependency counts as degraded, so a service that
+starts on its first request still answers 200 to the probe that lets that
+request through.
+
 ## Logging
 
 The core writes through a `Logger`: the part of pino's API the stack uses.
@@ -138,6 +171,8 @@ stack survive.
 | `withRetry(fn, config?)` | runs `fn` with the same retry policy, for a call that is not a client method |
 | `CircuitBreaker`, `CircuitState` | the breaker a client uses, for wrapping any async call; its state is `'closed'`, `'open'` or `'half-open'` |
 | `CircuitOpenError` | thrown by a breaker's call while it is open |
+| `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
+| `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
 | `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |
