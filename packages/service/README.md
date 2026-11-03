@@ -186,7 +186,7 @@ request through.
 ## Control
 
 The control operations are plain functions over a runtime. Each returns a
-`{ code, body }` pair, so an adapter only maps it onto its transport.
+`{ status, body }` pair, so an adapter only maps it onto its transport.
 
 ```ts
 import { controlStatus, createRuntime, verifyControlToken } from '@open-tomato/service';
@@ -198,8 +198,8 @@ const startedAt = Date.now();
 await runtime.ensureStarted();
 
 if (await verifyControlToken(sent, secret)) {
-  const { code, body } = controlStatus(runtime, { version: '2.0.0', startedAt });
-  console.log(code, body.status); // 200 'ok'
+  const { status, body } = controlStatus(runtime, { version: '2.0.0', startedAt });
+  console.log(status, body.status); // 200 'ok'
 }
 ```
 
@@ -208,9 +208,11 @@ if (await verifyControlToken(sent, secret)) {
 - `listDependencies(runtime)`: each dependency's name, status and health
   detail.
 - `pauseDependency`, `resumeDependency`, `restartDependency` and
-  `resetClient`, each `(runtime, name)`: 200 `{ ok: true }`, 400 for an
-  empty name or a missing `pause`/`resume`, 404 for an unknown name, 500
-  `{ error }` when the dependency throws.
+  `resetClient`, each `(runtime, name)`: 200 `{ ok: true }`, 400
+  `BAD_REQUEST` for an empty name or a missing `pause`/`resume`, 404
+  `NOT_FOUND` for an unknown name, and 500 `INTERNAL_ERROR` with the
+  dependency's message when it throws. Each failure body is an error body,
+  as in [Errors](#errors).
 - `verifyControlToken(given, expected)`: compares a token in constant
   time through WebCrypto. A non-string token or an empty secret is
   rejected.
@@ -248,6 +250,59 @@ console.log(config.port, config.version); // 3000 'unknown'
 zod is the core's one dependency. It has no Node-only code, so the core
 still runs on the web-standard globals alone.
 
+## Errors
+
+Every error response in the stack has one body: a machine-readable `code`,
+a `message`, and `details` when the error has some.
+
+```json
+{ "code": "NOT_FOUND", "message": "order not found", "details": { "orderId": "o-1" } }
+```
+
+Throw one of the error classes and the adapter answers with its status and
+body. `toErrorResponse` is the rule the adapters apply to anything thrown,
+and it uses what the error carries before falling back:
+
+```ts
+import { NotFoundError, toErrorResponse } from '@open-tomato/service';
+
+console.log(toErrorResponse(new NotFoundError('order not found', { orderId: 'o-1' })));
+// { status: 404, body: { code: 'NOT_FOUND', message: 'order not found', details: { orderId: 'o-1' } } }
+
+console.log(toErrorResponse(new Error('db at db-primary.internal refused')));
+// { status: 500, body: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } }
+```
+
+| Thrown | Status | Body |
+|---|---|---|
+| an `AppError` | its `statusCode` | its `toJSON()` |
+| a `ZodError` | 422 | `VALIDATION_ERROR`, one field error per issue in `details` |
+| a `CircuitOpenError` | 503 | `SERVICE_UNAVAILABLE` |
+| an error with a 4xx `status` or `statusCode` | that status | its own `code`, `message` and `details`, or the status's code and message where it has none |
+| an error with a 5xx status | that status | the status's generic code and message |
+| anything else | 500 | `INTERNAL_ERROR`, a generic message |
+
+A server error never sends the error's own message, code or details, which
+can carry internal context, so the handler logs the error for those. To
+change what callers see, give the adapter your own `ErrorFormatter`, a
+function from the thrown value to `{ status, body }`.
+
+On the calling side, `parseApiError(response)` reads a failed `Response`
+into `{ code, message, details?, statusCode }`. It also reads a 1.x
+`{ error }` body, and a body that is not JSON, by taking the code from the
+status.
+
+| Class | Status | Code |
+|---|---|---|
+| `BadRequestError` | 400 | `BAD_REQUEST` |
+| `UnauthorizedError` | 401 | `UNAUTHORIZED` |
+| `ForbiddenError` | 403 | `FORBIDDEN` |
+| `NotFoundError` | 404 | `NOT_FOUND` |
+| `ConflictError` | 409 | `CONFLICT` |
+| `ValidationError` | 422 | `VALIDATION_ERROR` |
+| `InternalError` | 500 | `INTERNAL_ERROR`; its details are dropped when `NODE_ENV` is `production` |
+| `AppError` | any | any, for a code of your own |
+
 ## Logging
 
 The core writes through a `Logger`: the part of pino's API the stack uses.
@@ -283,11 +338,15 @@ stack survive.
 | `CircuitOpenError` | thrown by a breaker's call while it is open |
 | `createRuntime(options)` | the runtime that starts, stops and reports on a service's dependencies and clients |
 | `Runtime`, `RuntimeOptions`, `RuntimeState`, `StopResult`, `DependencyRecord` | the runtime's types |
-| `controlStatus`, `listDependencies`, `pauseDependency`, `resumeDependency`, `restartDependency`, `resetClient` | the control operations, each returning `{ code, body }` |
+| `controlStatus`, `listDependencies`, `pauseDependency`, `resumeDependency`, `restartDependency`, `resetClient` | the control operations, each returning `{ status, body }` |
 | `verifyControlToken(given, expected)` | the control token check, constant time, on WebCrypto |
 | `ControlResult`, `ControlActionBody`, `ControlStatusBody`, `ControlStatusOptions`, `ControlTarget`, `DependencyControlStatus`, `ClientControlStatus` | the control operations' types |
 | `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
 | `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
+| `AppError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `ValidationError`, `InternalError` | the error classes, each with its status and code |
+| `toErrorResponse(error)`, `zodToValidationError(err)` | the default rule from anything thrown to `{ status, body }`, and a `ZodError` as a `ValidationError` |
+| `isErrorBody(value)`, `parseApiError(response)` | the calling side: whether a value is an error body, and a failed `Response` read into one |
+| `ErrorBody`, `FieldError`, `ErrorResponse`, `ErrorFormatter`, `ApiError` | the error types |
 | `BaseServiceConfigSchema`, `ControlConfigSchema` | the zod schemas for the shared config and its `control` field |
 | `BaseServiceConfig`, `ResolvedBaseServiceConfig`, `ControlConfig` | the config as written, the config once parsed, and the `control` field |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |

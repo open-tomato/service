@@ -1,21 +1,24 @@
 import type { CircuitState } from './circuit-breaker.js';
+import type { ErrorBody } from './errors.js';
 import type { HealthStatus } from './health.js';
 import type { DependencyRecord, Runtime } from './runtime.js';
 import type { Dependency, DependencyStatus } from './types.js';
 
+import { BadRequestError, InternalError, NotFoundError } from './errors.js';
+
 /**
  * The outcome of a control operation, for any transport to answer with:
- * an HTTP status code and a JSON-ready body.
+ * an HTTP status and a JSON-ready body.
  */
 export interface ControlResult<B> {
-  /** The HTTP status code to answer with. */
-  readonly code: number;
+  /** The HTTP status to answer with. */
+  readonly status: number;
   /** The response body. */
   readonly body: B;
 }
 
-/** The body of an action: `{ ok: true }` on success, `{ error }` otherwise. */
-export type ControlActionBody = { readonly ok: true } | { readonly error: string };
+/** The body of an action: `{ ok: true }` on success, an {@link ErrorBody} otherwise. */
+export type ControlActionBody = { readonly ok: true } | ErrorBody;
 
 /** A dependency's entry in the control status. */
 export interface DependencyControlStatus {
@@ -64,8 +67,12 @@ export type ControlTarget = Pick<Runtime<DependencyRecord, DependencyRecord>, 's
 
 type ActionResult = ControlResult<ControlActionBody>;
 
-const OK: ActionResult = { code: 200, body: { ok: true } };
-const INVALID_NAME: ActionResult = { code: 400, body: { error: 'invalid name parameter' } };
+const OK: ActionResult = { status: 200, body: { ok: true } };
+
+/** The result that answers with `error`'s status and body. */
+function failure(error: BadRequestError | NotFoundError | InternalError): ActionResult {
+  return { status: error.statusCode, body: error.toJSON() };
+}
 
 const BREAKER_STATE: Partial<Record<DependencyStatus, CircuitState>> = {
   running: 'closed',
@@ -99,10 +106,10 @@ function find(
   name: string,
   kind: 'dependency' | 'client',
 ): { readonly entry: Dependency } | { readonly result: ActionResult } {
-  if (typeof name !== 'string' || name === '') return { result: INVALID_NAME };
+  if (typeof name !== 'string' || name === '') return { result: failure(new BadRequestError('invalid name parameter')) };
   const entry = Object.values(record).find((candidate) => candidate.name === name);
   return entry === undefined
-    ? { result: { code: 404, body: { error: `${kind} not found` } } }
+    ? { result: failure(new NotFoundError(`${kind} not found`)) }
     : { entry };
 }
 
@@ -112,7 +119,7 @@ async function run(action: () => Promise<void>): Promise<ActionResult> {
     await action();
     return OK;
   } catch (err) {
-    return { code: 500, body: { error: errorMessage(err) } };
+    return failure(new InternalError(errorMessage(err), undefined, { cause: err }));
   }
 }
 
@@ -123,7 +130,7 @@ async function suspendOrResume(target: ControlTarget, name: string, method: 'pau
   const { entry } = found;
   const call = entry[method];
   if (typeof entry.pause !== 'function' || typeof entry.resume !== 'function' || call === undefined) {
-    return { code: 400, body: { error: `dependency does not support ${method}` } };
+    return failure(new BadRequestError(`dependency does not support ${method}`));
   }
   return run(() => call.call(entry));
 }
@@ -152,7 +159,7 @@ export function controlStatus(target: ControlTarget, options: ControlStatusOptio
   const clients = Object.fromEntries(Object.values(target.clients).map((entry) => [entry.name, clientStatus(entry)]));
 
   return {
-    code: 200,
+    status: 200,
     body: {
       serviceId: target.serviceId,
       status: target.health().status,
@@ -169,7 +176,7 @@ export function listDependencies(
   target: ControlTarget,
 ): ControlResult<readonly ({ readonly name: string } & DependencyControlStatus)[]> {
   return {
-    code: 200,
+    status: 200,
     body: Object.values(target.deps).map((entry) => ({ name: entry.name, ...dependencyStatus(entry) })),
   };
 }

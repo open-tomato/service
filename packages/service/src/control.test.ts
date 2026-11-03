@@ -53,7 +53,7 @@ describe('controlStatus', () => {
     const result = controlStatus(runtime, { version: '2.0.0', startedAt: 1_000, now: 61_500 });
 
     expect(result).toEqual({
-      code: 200,
+      status: 200,
       body: {
         serviceId: 'orders',
         status: 'ok',
@@ -71,7 +71,7 @@ describe('controlStatus', () => {
 
     const result = controlStatus(runtime, { version: '2.0.0', startedAt: 0, now: 0 });
 
-    expect(result.code).toBe(200);
+    expect(result.status).toBe(200);
     expect(result.body.status).toBe('error');
     expect(result.body.dependencies['cache']).toEqual({ status: 'stopped' });
   });
@@ -94,7 +94,7 @@ describe('listDependencies', () => {
     const runtime = await startedRuntime();
 
     expect(listDependencies(runtime)).toEqual({
-      code: 200,
+      status: 200,
       body: [{ name: 'db', status: 'running', detail: { pool: 5 } }, { name: 'cache', status: 'running' }],
     });
   });
@@ -104,35 +104,35 @@ describe('pauseDependency and resumeDependency', () => {
   it('pauses and resumes a dependency by name', async () => {
     const runtime = await startedRuntime();
 
-    expect(await pauseDependency(runtime, 'cache')).toEqual({ code: 200, body: { ok: true } });
+    expect(await pauseDependency(runtime, 'cache')).toEqual({ status: 200, body: { ok: true } });
     expect(runtime.deps.cache.status).toBe('paused');
-    expect(await resumeDependency(runtime, 'cache')).toEqual({ code: 200, body: { ok: true } });
+    expect(await resumeDependency(runtime, 'cache')).toEqual({ status: 200, body: { ok: true } });
     expect(runtime.deps.cache.status).toBe('running');
   });
 
   it('answers 404 for a name it does not know', async () => {
     const runtime = await startedRuntime();
 
-    expect(await pauseDependency(runtime, 'nope')).toEqual({ code: 404, body: { error: 'dependency not found' } });
+    expect(await pauseDependency(runtime, 'nope')).toEqual({ status: 404, body: { code: 'NOT_FOUND', message: 'dependency not found' } });
   });
 
   it('does not reach clients', async () => {
     const runtime = await startedRuntime();
 
-    expect(await pauseDependency(runtime, 'inventory')).toEqual({ code: 404, body: { error: 'dependency not found' } });
+    expect(await pauseDependency(runtime, 'inventory')).toEqual({ status: 404, body: { code: 'NOT_FOUND', message: 'dependency not found' } });
   });
 
   it('answers 400 for an empty name', async () => {
     const runtime = await startedRuntime();
 
-    expect(await resumeDependency(runtime, '')).toEqual({ code: 400, body: { error: 'invalid name parameter' } });
+    expect(await resumeDependency(runtime, '')).toEqual({ status: 400, body: { code: 'BAD_REQUEST', message: 'invalid name parameter' } });
   });
 
   it('answers 400 for a dependency without pause or resume', async () => {
     const runtime = await startedRuntime({ cache: bare('cache') });
 
-    expect(await pauseDependency(runtime, 'cache')).toEqual({ code: 400, body: { error: 'dependency does not support pause' } });
-    expect(await resumeDependency(runtime, 'cache')).toEqual({ code: 400, body: { error: 'dependency does not support resume' } });
+    expect(await pauseDependency(runtime, 'cache')).toEqual({ status: 400, body: { code: 'BAD_REQUEST', message: 'dependency does not support pause' } });
+    expect(await resumeDependency(runtime, 'cache')).toEqual({ status: 400, body: { code: 'BAD_REQUEST', message: 'dependency does not support resume' } });
   });
 
   it('answers 500 with the message when the dependency throws', async () => {
@@ -140,7 +140,7 @@ describe('pauseDependency and resumeDependency', () => {
 
     const result = await resumeDependency(runtime, 'cache');
 
-    expect(result).toEqual({ code: 500, body: { error: '[cache] Cannot resume a dependency that is not paused (current: running)' } });
+    expect(result).toEqual({ status: 500, body: { code: 'INTERNAL_ERROR', message: '[cache] Cannot resume a dependency that is not paused (current: running)' } });
   });
 });
 
@@ -151,7 +151,7 @@ describe('restartDependency', () => {
     const runtime = await startedRuntime({ cache });
     log.length = 0;
 
-    expect(await restartDependency(runtime, 'cache')).toEqual({ code: 200, body: { ok: true } });
+    expect(await restartDependency(runtime, 'cache')).toEqual({ status: 200, body: { ok: true } });
     expect(log).toEqual(['stop', 'start']);
   });
 
@@ -166,7 +166,7 @@ describe('restartDependency', () => {
     });
     const runtime = await startedRuntime({ cache });
 
-    expect(await restartDependency(runtime, 'cache')).toEqual({ code: 500, body: { error: 'cache is down' } });
+    expect(await restartDependency(runtime, 'cache')).toEqual({ status: 500, body: { code: 'INTERNAL_ERROR', message: 'cache is down' } });
   });
 });
 
@@ -175,14 +175,14 @@ describe('resetClient', () => {
     const runtime = await startedRuntime();
     await runtime.clients.inventory.stop();
 
-    expect(await resetClient(runtime, 'inventory')).toEqual({ code: 200, body: { ok: true } });
+    expect(await resetClient(runtime, 'inventory')).toEqual({ status: 200, body: { ok: true } });
     expect(runtime.clients.inventory.status).toBe('running');
   });
 
   it('does not reach dependencies', async () => {
     const runtime = await startedRuntime();
 
-    expect(await resetClient(runtime, 'db')).toEqual({ code: 404, body: { error: 'client not found' } });
+    expect(await resetClient(runtime, 'db')).toEqual({ status: 404, body: { code: 'NOT_FOUND', message: 'client not found' } });
   });
 });
 

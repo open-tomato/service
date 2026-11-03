@@ -32,6 +32,22 @@ export type {
   DependencyControlStatus,
 } from './control.js';
 
+export {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  InternalError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from './errors.js';
+export type { ErrorBody, FieldError } from './errors.js';
+export { toErrorResponse, zodToValidationError } from './error-response.js';
+export type { ErrorFormatter, ErrorResponse } from './error-response.js';
+export { isErrorBody, parseApiError } from './error-client.js';
+export type { ApiError } from './error-client.js';
+
 export { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
 export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from './schema.js';
 

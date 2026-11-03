@@ -4,6 +4,9 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import { CircuitBreaker } from './circuit-breaker.js';
 import * as control from './control.js';
+import * as errorClient from './error-client.js';
+import * as errorResponse from './error-response.js';
+import * as errors from './errors.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
@@ -42,6 +45,19 @@ describe('public exports', () => {
   it('exports the base config schema and the control config schema', () => {
     expect(core.BaseServiceConfigSchema).toBe(BaseServiceConfigSchema);
     expect(core.ControlConfigSchema).toBe(ControlConfigSchema);
+  });
+
+  it('exports the error classes, the default formatter and the client helpers', () => {
+    const coreExports: Record<string, unknown> = core;
+    const classes = Object.entries(errors);
+    for (const [name, value] of classes) {
+      expect(coreExports[name]).toBe(value);
+    }
+    expect(classes).toHaveLength(8);
+    expect(core.toErrorResponse).toBe(errorResponse.toErrorResponse);
+    expect(core.zodToValidationError).toBe(errorResponse.zodToValidationError);
+    expect(core.isErrorBody).toBe(errorClient.isErrorBody);
+    expect(core.parseApiError).toBe(errorClient.parseApiError);
   });
 
   it('exports the CircuitState type', () => {
