@@ -95,9 +95,36 @@ returns the verified claims. Without `auth`, both are no-ops.
 | rate limit | 100 requests per 60 s by default; set `rateLimit` |
 | body parsing | JSON and URL-encoded, up to `1mb` by default; set `body.limit` |
 | request log | pino-http, with `authorization`, `cookie` and `x-api-key` headers redacted |
-| error handler | a `5xx` answers `Internal Server Error` without the error's message; a `4xx` keeps its message |
+| error handler | answers `{ code, message, details? }`, a `5xx` without the error's own text; one log line per error; see [Errors](#errors) |
 | `GET /health` | `200 {"status":"ok"}`, or `503` once a dependency or client is in `error` |
 | shutdown | on `SIGTERM`/`SIGINT`, drains for 10 s by default, then closes stuck connections; set `shutdown.drainTimeout` |
+
+## Errors
+
+Throw one of the core's error classes from a route, and the error handler
+answers with its status and body. This package re-exports them.
+
+```ts
+import { createService, NotFoundError } from '@open-tomato/service-express';
+
+await createService({
+  serviceId: 'orders',
+  register(app) {
+    app.get('/orders/:id', (req) => {
+      throw new NotFoundError('order not found', { orderId: req.params['id'] });
+    });
+  },
+});
+// GET /orders/o-1 → 404 {"code":"NOT_FOUND","message":"order not found","details":{"orderId":"o-1"}}
+```
+
+Anything else thrown goes through the core's `toErrorResponse`, which
+uses what the error carries and falls back to a generic message and code;
+the core's README has the full rule. Each error writes one log line
+through the service logger: a warning with the code for a `4xx`, and an
+error with the hidden name, code and stack for a `5xx`. To send a body of
+your own, set `formatError`; if it throws, the default rule answers
+instead.
 
 ## The control plane
 
@@ -131,6 +158,7 @@ constant time.
 | `body` | `1mb` | `{ limit }` |
 | `shutdown` | 10 s | `{ drainTimeout }` in milliseconds |
 | `control` | off | `{ enabled, secret }` |
+| `formatError` | the core's `toErrorResponse` | `(error) => { status, body }`, for an error body of your own |
 
 `createService` resolves to `{ app, stop() }`. The logger reads `LOG_LEVEL`
 (default `info`), and pretty-prints when `NODE_ENV=development`.

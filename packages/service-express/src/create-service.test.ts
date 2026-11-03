@@ -1,6 +1,6 @@
 import type { ServiceContext , ServiceHandle } from './types.js';
 
-import { createDependency } from '@open-tomato/service';
+import { createDependency, NotFoundError } from '@open-tomato/service';
 import request from 'supertest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -301,7 +301,46 @@ describe('createService — error handler', () => {
     });
 
     const res = await request(handle.app).get('/boom');
-    expect(res.status).toBeGreaterThanOrEqual(500);
-    expect(res.status).toBeLessThan(600);
+    expect(res.status).toBe(500);
+    expect(res.body).toStrictEqual({ code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
+  });
+
+  it('answers an error class with its status and body', async () => {
+    handle = await createService({
+      serviceId: 'test-svc',
+      register(app) {
+        app.get('/orders/:id', (req) => {
+          throw new NotFoundError('order not found', { orderId: req.params['id'] });
+        });
+      },
+    });
+
+    const res = await request(handle.app).get('/orders/o-1');
+    expect(res.status).toBe(404);
+    expect(res.body).toStrictEqual({ code: 'NOT_FOUND', message: 'order not found', details: { orderId: 'o-1' } });
+  });
+
+  it('answers with config.formatError when the service gives one', async () => {
+    handle = await createService({
+      serviceId: 'test-svc',
+      formatError: (err) => ({ status: 400, body: { code: 'ORDERS_FAILED', message: String((err as Error).message) } }),
+      register(app) {
+        app.get('/boom', () => {
+          throw new Error('custom');
+        });
+      },
+    });
+
+    const res = await request(handle.app).get('/boom');
+    expect(res.status).toBe(400);
+    expect(res.body).toStrictEqual({ code: 'ORDERS_FAILED', message: 'custom' });
+  });
+
+  it('rejects a formatError that is not a function', async () => {
+    await expect(createService({
+      serviceId: 'test-svc',
+      formatError: 'json' as never,
+      register() {},
+    })).rejects.toThrow('formatError must be a function');
   });
 });

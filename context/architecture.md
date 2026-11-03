@@ -25,7 +25,7 @@ This table shows each concern's home today and where it is moving.
 | Retry with exponential backoff | core, `withRetry` exported | core |
 | Circuit breaker | core, `CircuitBreaker` exported | core |
 | Logging | core takes an injected `Logger`, console by default | core |
-| Errors | `service-errors` | error classes in core, the HTTP handler in the Express adapter |
+| Errors | core classes and `toErrorResponse`; the Express handler answers with them, its control routes still answer `{ error }` | core; each adapter maps them onto its transport |
 | Config contracts | core `BaseServiceConfigSchema`; each adapter still has its own schema | the base schema, extended by each adapter |
 | OpenAPI | not built | core describes the routes, adapters render the document |
 

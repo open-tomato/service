@@ -1,6 +1,6 @@
 import type { ControlConfig } from './control/types.js';
 import type { ServiceContext } from './types.js';
-import type { Dependency, ServicePlugin } from '@open-tomato/service';
+import type { Dependency, ErrorFormatter, ServicePlugin } from '@open-tomato/service';
 import type { Application } from 'express';
 
 import { z } from 'zod';
@@ -90,6 +90,14 @@ export const ServiceConfigSchema = z.object({
    * @default []
    */
   plugins: z.custom<ServicePlugin<{ app: Application } & ServiceContext>[]>().default(() => []),
+  /**
+   * Turns anything a route throws into the status and body the error
+   * handler answers with. When omitted, the core's `toErrorResponse` is
+   * used, which answers `{ code, message, details? }`.
+   */
+  formatError: z.custom<ErrorFormatter>((value) => typeof value === 'function', {
+    error: 'formatError must be a function',
+  }).optional(),
   /**
    * Operator control-plane configuration.
    * When enabled, mounts `/_control/*` routes protected by `secret`.

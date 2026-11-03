@@ -31,17 +31,6 @@
         "zod": "^4.6.7",
       },
     },
-    "packages/service-errors": {
-      "name": "@open-tomato/service-errors",
-      "version": "0.0.0",
-      "devDependencies": {
-        "@types/express": "^5.0.6",
-        "zod": "^4.6.7",
-      },
-      "peerDependencies": {
-        "zod": "^4.6.7",
-      },
-    },
     "packages/service-express": {
       "name": "@open-tomato/service-express",
       "version": "1.0.2",
@@ -137,8 +126,6 @@
     "@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
 
     "@open-tomato/service": ["@open-tomato/service@workspace:packages/service"],
-
-    "@open-tomato/service-errors": ["@open-tomato/service-errors@workspace:packages/service-errors"],
 
     "@open-tomato/service-express": ["@open-tomato/service-express@workspace:packages/service-express"],
 

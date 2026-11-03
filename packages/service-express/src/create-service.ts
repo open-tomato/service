@@ -10,7 +10,8 @@ import { buildRequireAuth, buildOptionalAuth, passthroughMiddleware } from './au
 import { mountBuiltinRoutes } from './builtin-routes.js';
 import { buildClientsMap } from './clients-map.js';
 import { buildDepsMap } from './deps-map.js';
-import { applyMiddleware, errorHandler } from './middleware.js';
+import { createErrorHandler } from './error-handler.js';
+import { applyMiddleware } from './middleware.js';
 import { ServiceConfigSchema } from './schema.js';
 import { gracefulStop, registerShutdown } from './shutdown.js';
 
@@ -94,7 +95,7 @@ export async function createService(config: ServiceConfig): Promise<ServiceHandl
   await resolved.register(app, ctx);
 
   // 5. Error handler — always last
-  app.use(errorHandler);
+  app.use(createErrorHandler(logger, resolved.formatError));
 
   // 6. Listen
   const port = process.env.NODE_ENV === 'test'

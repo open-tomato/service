@@ -1,7 +1,7 @@
 # Release
 
 Each public package versions on its own and publishes to npmjs under the
-`@open-tomato` scope. `service-errors` is private and never publishes.
+`@open-tomato` scope.
 
 ## Release lines
 

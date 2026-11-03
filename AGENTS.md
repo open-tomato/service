@@ -14,7 +14,6 @@ mostly configuration and the wiring of its endpoints.
 | `packages/service-express` | `@open-tomato/service-express` | Express 5 adapter |
 | `packages/service-mcp` | `@open-tomato/service-mcp` | Model Context Protocol adapter |
 | `packages/service-logger` | `@open-tomato/service-logger` | pino logger, Node and browser entries |
-| `packages/service-errors` | `@open-tomato/service-errors` | private; being split into core and Express |
 
 The core never imports a framework, and an adapter never re-implements what
 the core can own. `context/architecture.md` has the layering, where each
