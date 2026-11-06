@@ -19,6 +19,14 @@ import { DEBUG_MESSAGE, INFO_MESSAGE, TOOL_NAME, TOOL_RESULT } from './fixtures/
 const FIXTURE = fileURLToPath(new URL('./fixtures/stdio-server.ts', import.meta.url));
 const REGISTER_HOOK = fileURLToPath(new URL('./fixtures/register-ts-resolve.mjs', import.meta.url));
 
+/**
+ * Node strips TypeScript types by default from 22.18 on. An older Node 22, which the engines range
+ * allows, needs the flag to load the `.ts` fixture; Bun reports no `false` and runs it as is.
+ */
+const STRIP_TYPES_FLAGS = process.features.typescript === false
+  ? ['--experimental-strip-types']
+  : [];
+
 const PROTOCOL_VERSION = '2025-03-26';
 const INITIALIZE_ID = 1;
 const CALL_ID = 2;
@@ -65,7 +73,7 @@ describe('createMCP over stdio — log output', () => {
   }
 
   beforeAll(async () => {
-    child = spawn(process.execPath, ['--import', REGISTER_HOOK, FIXTURE], {
+    child = spawn(process.execPath, [...STRIP_TYPES_FLAGS, '--import', REGISTER_HOOK, FIXTURE], {
       env: {
         ...process.env,
         MCP_TRANSPORT: 'stdio',
