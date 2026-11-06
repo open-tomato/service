@@ -3,7 +3,13 @@ import type { LogBreadcrumb } from '@open-tomato/service';
 
 import process from 'node:process';
 
-import { SCOPE_FIELD, STARTED_MESSAGE, TRACE_ID_FIELD } from '@open-tomato/service';
+import {
+  DOMAIN_FIELD,
+  SCOPE_FIELD,
+  STARTED_MESSAGE,
+  STEP_FIELD,
+  TRACE_ID_FIELD,
+} from '@open-tomato/service';
 
 /**
  * Turns one pino record line into the text written for it.
@@ -19,8 +25,14 @@ type LogRecord = LogBreadcrumb & Record<string, unknown>;
 /** pino's own keys, never repeated as `key=value` fields. */
 const PINO_KEYS: ReadonlySet<string> = new Set(['time', 'level', 'pid', 'hostname', 'msg']);
 
+/** The breadcrumb levels joined into the signature slot, outermost first. */
+const SIGNATURE_KEYS: readonly string[] = [DOMAIN_FIELD, SCOPE_FIELD, STEP_FIELD];
+
 /** The keys drawn in a slot of their own rather than as fields. */
-const SLOT_KEYS: ReadonlySet<string> = new Set(['service', TRACE_ID_FIELD, SCOPE_FIELD, 'err']);
+const SLOT_KEYS: ReadonlySet<string> = new Set(['service', TRACE_ID_FIELD, ...SIGNATURE_KEYS, 'err']);
+
+/** What joins the levels of the signature slot. */
+const SIGNATURE_SEPARATOR = ':';
 
 /** How many characters of the trace id the line shows. */
 const SHORT_TRACE_ID_LENGTH = 8;
@@ -163,11 +175,25 @@ function formatFields(record: LogRecord, keys: readonly string[], paint: Paint):
 /** What separates the time, the level and the slots after them. */
 const HEAD_SEPARATOR = ' ';
 
-/** The service, short trace id, scope and message slots; a missing one is dropped. */
+/**
+ * The present `domain`, `scope` and `step` joined by `:` in that order, as
+ * `Users:create:insert`; a missing level leaves no empty separator, and a
+ * record with none of the three has no signature.
+ */
+function signature(record: LogRecord): string | undefined {
+  const levels = SIGNATURE_KEYS
+    .map(key => stringSlot(record[key]))
+    .filter((level): level is string => level !== undefined);
+  return levels.length === 0
+    ? undefined
+    : levels.join(SIGNATURE_SEPARATOR);
+}
+
+/** The service, short trace id, signature and message slots; a missing one is dropped. */
 function bodySlots(record: LogRecord, paint: Paint): string[] {
   const service = stringSlot(record.service);
   const traceId = stringSlot(record[TRACE_ID_FIELD]);
-  const scope = stringSlot(record[SCOPE_FIELD]);
+  const breadcrumbs = signature(record);
   return [
     service === undefined
       ? undefined
@@ -175,9 +201,9 @@ function bodySlots(record: LogRecord, paint: Paint): string[] {
     traceId === undefined
       ? undefined
       : paint('gray', traceId.slice(0, SHORT_TRACE_ID_LENGTH)),
-    scope === undefined
+    breadcrumbs === undefined
       ? undefined
-      : paint('magenta', scope),
+      : paint('magenta', breadcrumbs),
     stringSlot(record.msg),
   ].filter((slot): slot is string => slot !== undefined);
 }
@@ -266,8 +292,8 @@ export const json: Decorator = line => line;
  * Draws one pino record line for a person at a terminal.
  *
  * The line reads time, level, service, the first 8 characters of the trace
- * id, scope, message, then the other fields as `key=value`; a missing slot
- * is dropped. The serialised `err` and each link of its `cause` chain follow
+ * id, the signature (`domain`, `scope` and `step` joined by `:`), message,
+ * then the other fields as `key=value`; a missing slot is dropped. The serialised `err` and each link of its `cause` chain follow
  * as one `<type>: <message>` line each, and a `started` record is drawn as a
  * short block. Colour is off when `NO_COLOR` is set to a non-empty value.
  *

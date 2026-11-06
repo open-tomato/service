@@ -148,7 +148,7 @@ describe('createLogger — format pick', () => {
 
   it('keeps the terminal channel for a child and writes before the call returns', () => {
     fakeIsTTY(true);
-    const child = createLogger('orders').child({ traceId: '3f2a9c1e5d6b4a', scope: 'Users:create' });
+    const child = createLogger('orders').child({ traceId: '3f2a9c1e5d6b4a', domain: 'Users', scope: 'create' });
 
     child.warn('slow');
 

@@ -1,4 +1,4 @@
-import { logStarted, scoped } from '@open-tomato/service';
+import { inDomain, logStarted } from '@open-tomato/service';
 import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -47,13 +47,14 @@ describe('terminal', () => {
     setNoColor(originalNoColor);
   });
 
-  it('draws the slots in order with the short trace id, the scope and the fields', () => {
+  it('draws the slots in order with the short trace id, the signature and the fields', () => {
     const input = line({
       pid: 7,
       hostname: 'localhost',
       service: 'orders',
       traceId: '3f2a9c1e5d6b4a',
-      scope: 'Users:create',
+      domain: 'Users',
+      scope: 'create',
       msg: 'user created',
       userId: 42,
     });
@@ -62,20 +63,52 @@ describe('terminal', () => {
       .toBe(`${CLOCK} INFO  orders  3f2a9c1e  Users:create  user created  userId=42\n`);
   });
 
-  it('drops the trace id and scope slots when the record has neither', () => {
+  it('drops the trace id and signature slots when the record has neither', () => {
     const input = line({ service: 'orders', msg: 'user created', userId: 42 });
 
     expect(terminal(input)).toBe(`${CLOCK} INFO  orders  user created  userId=42\n`);
   });
 
-  it('reads the breadcrumbs a scoped pino child writes', () => {
+  it('reads the breadcrumbs a domain and scope pino child writes', () => {
     const lines: string[] = [];
     const logger = capturingPino(lines);
 
-    scoped(logger.child({ traceId: 'abcdef0123456789' }), 'Users', 'create').warn('slow');
+    inDomain(logger.child({ traceId: 'abcdef0123456789' }), 'Users').child({ scope: 'create' })
+      .warn('slow');
 
     expect(lines).toHaveLength(1);
     expect(terminal(lines[0] ?? '')).toMatch(/^\d\d:\d\d:\d\d\.\d{3} WARN {2}orders {2}abcdef01 {2}Users:create {2}slow\n$/);
+  });
+
+  it('joins domain, scope and step into one signature slot', () => {
+    const input = line({ service: 'orders', domain: 'Users', scope: 'create', step: 'insert', msg: 'user created' });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  orders  Users:create:insert  user created\n`);
+  });
+
+  it('joins domain and scope with no step and no empty separator', () => {
+    const input = line({ service: 'orders', domain: 'Users', scope: 'create', msg: 'user created' });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  orders  Users:create  user created\n`);
+  });
+
+  it('draws the domain alone as the signature', () => {
+    const input = line({ service: 'orders', domain: 'Users', msg: 'user created' });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  orders  Users  user created\n`);
+  });
+
+  it('draws no signature slot when the record has no domain, scope or step', () => {
+    const input = line({ service: 'orders', msg: 'user created' });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  orders  user created\n`);
+  });
+
+  it('repeats none of domain, scope and step as a key=value field', () => {
+    const drawn = terminal(line({ domain: 'Users', scope: 'create', step: 'insert', msg: 'm', userId: 42 }));
+
+    expect(drawn).toBe(`${CLOCK} INFO  Users:create:insert  m  userId=42\n`);
+    expect(drawn).not.toMatch(/\b(domain|scope|step)=/);
   });
 
   it('quotes a string field with spaces and writes an object field as JSON', () => {
@@ -102,7 +135,7 @@ describe('terminal', () => {
   });
 
   it('writes no colour under NO_COLOR, and colour when NO_COLOR is unset or empty', () => {
-    const input = line({ service: 'orders', traceId: '3f2a9c1e5d', scope: 'Users:create', msg: 'm' });
+    const input = line({ service: 'orders', traceId: '3f2a9c1e5d', domain: 'Users', scope: 'create', msg: 'm' });
 
     expect(terminal(input)).not.toContain(ESCAPE);
 

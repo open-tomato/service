@@ -76,12 +76,13 @@ record, and at most ten links.
 
 ## Breadcrumbs
 
-Two fields are drawn as slots rather than `key=value` pairs, so the lines of
+Four fields are drawn as slots rather than `key=value` pairs, so the lines of
 one request read as a path through the code:
 
 - `traceId` shows its first 8 characters, `3f2a9c1e` above;
-- `scope` shows the module and action that logged the line, `Users:create`
-  above.
+- `domain`, `scope` and `step`, those present, are joined by `:` in that
+  order into one signature slot: `Users:create:insert` for all three,
+  `Users:create` for a domain and a scope, `Users` for the domain alone.
 
 Bind them with `child`. The core's `scoped(logger, 'Users', 'create')`, from
 `@open-tomato/service`, sets the scope for you. A record with neither slot
