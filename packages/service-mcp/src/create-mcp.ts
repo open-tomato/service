@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createLogger } from '@open-tomato/service-logger';
 
 import { startHealthServer } from './health.js';
+import { resolvePortConfig } from './listen.js';
 import { MCPConfigSchema } from './schema.js';
 import { resolveTransport, wireHttpTransport, wireStdioTransport } from './transport.js';
 
@@ -46,13 +47,13 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  * - _(default)_ `MCP_TRANSPORT` unset or any value other than `'stdio'`:
  *   `StreamableHTTPServerTransport` in stateful mode
  *   (`sessionIdGenerator: () => randomUUID()`), served by a Node HTTP server
- *   on `PORT` (default `8080`). Stateless mode is intentionally avoided — it breaks the MCP
+ *   on `port`, else `PORT`, else `8080`. Stateless mode is intentionally avoided — it breaks the MCP
  *   `initialize` handshake which requires at least two HTTP round-trips.
  * - `MCP_TRANSPORT=stdio`: `StdioServerTransport` for local dev and Claude
  *   Desktop integration. The health server is **not** started in this mode.
  *
  * **4. Health** _(HTTP mode only)_ — a lightweight `node:http` server starts on
- * `health.port` (default `3001`) at `health.path` (default `'/health'`).
+ * `health.port`, else `HEALTH_PORT`, else `3001`, at `health.path` (default `'/health'`).
  * The response aggregates circuit-breaker states from all registered clients:
  * `"ok"` when all circuits are closed, `"degraded"` when any circuit is open or
  * half-open, `"error"` when the MCP transport itself has failed.
@@ -104,6 +105,7 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  */
 export function createMCP(config: MCPConfig): MCPHandle {
   const resolved = MCPConfigSchema.parse(config);
+  const ports = resolvePortConfig(resolved);
   const logger = createLogger(resolved.serviceId, resolved.logger);
   const clientsMap = buildClientsMap(resolved.clients);
   const server = new McpServer({ name: resolved.serviceId, version: '1.0.0' });
@@ -124,10 +126,9 @@ export function createMCP(config: MCPConfig): MCPHandle {
     const transport = resolveTransport();
 
     if (transport === 'http') {
-      const port = Number(process.env['PORT'] ?? 8080);
-      transportInstance = await wireHttpTransport(server, port);
+      transportInstance = await wireHttpTransport(server, ports.port);
       healthServer = startHealthServer({
-        port: resolved.health.port,
+        port: ports.health.port,
         path: resolved.health.path,
         serviceId: resolved.serviceId,
         clients: resolved.clients,
@@ -166,6 +167,6 @@ export function createMCP(config: MCPConfig): MCPHandle {
 
   return {
     stop: shutdown,
-    healthUrl: () => `http://localhost:${resolved.health.port}${resolved.health.path}`,
+    healthUrl: () => `http://localhost:${ports.health.port}${resolved.health.path}`,
   };
 }

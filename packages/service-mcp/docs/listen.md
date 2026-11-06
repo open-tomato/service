@@ -15,6 +15,24 @@ taken port the same way.
   listens `server` on the port it picked. It answers the pick, with `port`
   read back from the bound address, so port `0` answers the port the system
   chose. `requested` and `fellBack` come from the pick unchanged.
+- `resolvePortConfig(config, env)` settles what to ask for, for both
+  servers. The transport port comes from `config.port`, else `PORT`, else
+  `8080`; its strict flag from `config.strictPort`, else `PORT_STRICT`,
+  else `false`. The health server reads `config.health.port`, else
+  `HEALTH_PORT`, else `3001`, and `config.health.strictPort`, else
+  `HEALTH_PORT_STRICT`, else `false`. Each of the four is settled on its
+  own. A strict variable is `true` only for `true` or `1`, any case, around
+  any whitespace. An empty port variable counts as unset, and one that is
+  not a whole number throws a `RangeError` naming the variable. `env`
+  defaults to `process.env`.
+
+## Why the schema leaves the ports unset
+
+`MCPConfigSchema` gives `port`, `strictPort`, `health.port` and
+`health.strictPort` no default, so an omitted field stays `undefined` and
+`resolvePortConfig` can tell it apart from one the caller set. A schema
+default would hide the environment. Port `0` is a value the caller set,
+not an omission.
 
 ## Why it re-picks once
 
@@ -50,6 +68,15 @@ port free drives the second `EADDRINUSE` into `PortInUseError`. Setting the
 attempts to one fails both re-pick cases, and a probe that never answers
 `false` fails the probe, the fallback and the first re-pick case, so the
 checks can fail.
+
+The `resolvePortConfig` cases pass an `env` record, so they leave
+`process.env` alone, except one that sets the four variables to show the
+default and restores them. They check the defaults, the config read before
+the env, the env read when the config is silent, each value settled on its
+own, the transport and health names kept apart, a config port `0` counted
+as given, each strict and non-strict spelling, an empty port variable, and
+a malformed `PORT` or `HEALTH_PORT`. Reading `PORT` before the config and
+dropping the `1` spelling fail eight of them.
 
 ## Usage
 

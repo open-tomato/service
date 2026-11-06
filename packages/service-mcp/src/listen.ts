@@ -105,3 +105,82 @@ export async function listenOnPickedPort(
   throw new PortInUseError({ port: lastPort, configKey: rule.configKey, cause: lastError });
 }
 
+/** The port the HTTP transport listens on when neither the config nor `PORT` names one. */
+export const DEFAULT_PORT = 8080;
+
+/** The port the health server listens on when neither the config nor `HEALTH_PORT` names one. */
+export const DEFAULT_HEALTH_PORT = 3001;
+
+/** The port fields of the MCP config that {@link resolvePortConfig} reads. */
+export interface PortConfigInput {
+  /** The configured transport port, read before `PORT`. */
+  readonly port?: number | undefined;
+  /** The configured transport strict flag, read before `PORT_STRICT`. */
+  readonly strictPort?: boolean | undefined;
+  /** The configured health port and strict flag, read before `HEALTH_PORT` and `HEALTH_PORT_STRICT`. */
+  readonly health?: {
+    readonly port?: number | undefined;
+    readonly strictPort?: boolean | undefined;
+  } | undefined;
+}
+
+/** One port and its strict flag, as {@link resolvePortConfig} settled them. */
+export interface ResolvedPort {
+  /** The port to ask for. */
+  readonly port: number;
+  /** Whether a taken port rejects instead of falling back. */
+  readonly strict: boolean;
+}
+
+/** The transport and health ports {@link resolvePortConfig} settled on. */
+export interface ResolvedPortConfig extends ResolvedPort {
+  /** The health server's port and strict flag. */
+  readonly health: ResolvedPort;
+}
+
+/** The environment {@link resolvePortConfig} reads, `process.env` by default. */
+export type PortEnv = Readonly<Record<string, string | undefined>>;
+
+/** Reads the variable `name` as a whole number, `undefined` when unset or empty. */
+function readPortEnv(env: PortEnv, name: string): number | undefined {
+  const raw = env[name]?.trim();
+  if (raw === undefined || raw === '') return undefined;
+  const port = Number(raw);
+  if (!Number.isInteger(port)) {
+    throw new RangeError(`${name} must be a whole number, got "${raw}"`);
+  }
+  return port;
+}
+
+/** Reads the variable `name` as a strict flag: `true` only for `true` or `1`, `undefined` when unset. */
+function readStrictEnv(env: PortEnv, name: string): boolean | undefined {
+  const raw = env[name];
+  if (raw === undefined) return undefined;
+  const value = raw.trim().toLowerCase();
+  return value === 'true' || value === '1';
+}
+
+/**
+ * Settles the transport and health ports and their strict flags for the MCP
+ * adapter: each comes from the config field when set, else from its
+ * environment variable (`PORT`, `PORT_STRICT`, `HEALTH_PORT`,
+ * `HEALTH_PORT_STRICT`), else from the default (8080, 3001, `false`).
+ *
+ * @param config - The `port`, `strictPort` and `health` fields of the MCP config.
+ * @param env - The environment to read; defaults to `process.env`.
+ * @returns The transport port and strict flag, and the health port and strict flag.
+ * @throws {RangeError} If `PORT` or `HEALTH_PORT` is set to something other than a whole number.
+ */
+export function resolvePortConfig(
+  config: PortConfigInput,
+  env: PortEnv = process.env,
+): ResolvedPortConfig {
+  return {
+    port: config.port ?? readPortEnv(env, 'PORT') ?? DEFAULT_PORT,
+    strict: config.strictPort ?? readStrictEnv(env, 'PORT_STRICT') ?? false,
+    health: {
+      port: config.health?.port ?? readPortEnv(env, 'HEALTH_PORT') ?? DEFAULT_HEALTH_PORT,
+      strict: config.health?.strictPort ?? readStrictEnv(env, 'HEALTH_PORT_STRICT') ?? false,
+    },
+  };
+}

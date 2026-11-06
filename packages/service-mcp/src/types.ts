@@ -59,10 +59,17 @@ export interface MCPHandle {
  */
 export interface HealthConfig {
   /**
-   * Port on which the health server listens.
-   * @default 3001
+   * Port on which the health server listens. When omitted, the
+   * `HEALTH_PORT` environment variable is read, then `3001`.
    */
   port?: number
+  /**
+   * When `true`, a taken health port rejects with `PortInUseError` instead
+   * of falling back to a later port. When omitted, the
+   * `HEALTH_PORT_STRICT` environment variable is read (`true` or `1`), then
+   * `false`.
+   */
+  strictPort?: boolean
   /**
    * URL path for the health check route.
    * @default '/health'
@@ -106,6 +113,35 @@ export interface MCPConfig {
   setup: (server: McpServer, ctx: MCPContext) => void | Promise<void>
 
   /**
+   * Port for the HTTP transport. When omitted, the `PORT` environment
+   * variable is read, then `8080`. Not used in `stdio` transport mode.
+   */
+  port?: number
+
+  /**
+   * When `true`, a taken transport port rejects with `PortInUseError`
+   * instead of falling back to a later port. When omitted, the
+   * `PORT_STRICT` environment variable is read (`true` or `1`), then
+   * `false`.
+   */
+  strictPort?: boolean
+
+  /**
+   * Version of the MCP server, passed to `McpServer` and shown in the
+   * startup banner.
+   *
+   * @default 'unknown'
+   */
+  version?: string
+
+  /**
+   * Feature flags or settings shown in the startup banner.
+   *
+   * @default {}
+   */
+  features?: Record<string, string | number | boolean>
+
+  /**
    * Configuration for the standalone HTTP health endpoint.
    * Not used in `stdio` transport mode.
    */
@@ -133,10 +169,20 @@ export interface ResolvedMCPConfig {
   clients: TypedClient<unknown>[]
   /** @see MCPConfig.setup */
   setup: (server: McpServer, ctx: MCPContext) => void | Promise<void>
-  /** Health endpoint configuration with all defaults applied. */
+  /** @see MCPConfig.port — left unset so `resolvePortConfig` can read `PORT`. */
+  port?: number
+  /** @see MCPConfig.strictPort — left unset so `resolvePortConfig` can read `PORT_STRICT`. */
+  strictPort?: boolean
+  /** @see MCPConfig.version */
+  version: string
+  /** @see MCPConfig.features */
+  features: Record<string, string | number | boolean>
+  /** Health endpoint configuration with the path default applied. */
   health: {
-    /** @default 3001 */
-    port: number
+    /** @see HealthConfig.port — left unset so `resolvePortConfig` can read `HEALTH_PORT`. */
+    port?: number
+    /** @see HealthConfig.strictPort — left unset so `resolvePortConfig` can read `HEALTH_PORT_STRICT`. */
+    strictPort?: boolean
     /** @default '/health' */
     path: string
   }
