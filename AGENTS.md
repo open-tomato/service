@@ -28,6 +28,12 @@ imports and globals; `context/architecture.md` has the rule.
 `context/verification.md` says what each gate proves and how to run one
 scoped to a change.
 
+Each Edit or Write runs `eslint --fix` on its file
+(`.claude/hooks/eslint-fix.ts`, registered in `.claude/settings.json`), so
+what ESLint can repair by itself is fixed as it is written. Run
+`bun run lint:fix` before the gates to sweep the rest, and fix by hand only
+what it leaves.
+
 ## Docs: the shadow tree
 
 `packages/<name>/src/<path>.ts` pairs with `packages/<name>/docs/<path>.md`.
