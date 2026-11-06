@@ -37,6 +37,21 @@ as fields. The trace id and the three signature levels are read through the
 core's `TRACE_ID_FIELD`, `DOMAIN_FIELD`, `SCOPE_FIELD` and `STEP_FIELD`, so a
 rename in the core reaches the decorator.
 
+Each signature level is set where its value is known. The domain is bound when
+a domain's logger is made, `inDomain(logger, 'Users')`. The scope is bound at
+an entry point of a file's workflow, `scoped(log, 'create')`, with one
+argument. The step goes in the context object of each call, as
+`{ step: 'insert' }`, and is never bound: a step bound with `child` would stick
+to every later record that child writes. The terminal line above is therefore
+the `insert` record of `Users`, `create`, and it draws `Users:create:insert`.
+
+Each step takes a level by one rule:
+
+- `trace` or `debug` for a routine step, so most steps of a flow get one;
+- `info` only for a key step on the use case's critical path, the records a
+  persisted traceability destination keeps;
+- `warn` or `error` for a step that failed.
+
 ## Errors
 
 A record holding a serialised `err` gets one `<type>: <message>` line per
