@@ -1,6 +1,6 @@
 ---
 plan: health-rule-service
-title: One health rule in the core, aggregateHealth
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

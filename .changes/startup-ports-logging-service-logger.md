@@ -1,6 +1,6 @@
 ---
 plan: startup-ports-logging-service-logger
-title: Startup ports, the startup banner and readable terminal logs
+title: Where log lines go and what they carry
 level: major
 package: @open-tomato/service-logger
 ---

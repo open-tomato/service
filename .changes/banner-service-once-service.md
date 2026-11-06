@@ -1,6 +1,6 @@
 ---
 plan: banner-service-once-service
-title: The started line names the service once
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

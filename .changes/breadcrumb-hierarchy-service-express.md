@@ -1,6 +1,6 @@
 ---
 plan: breadcrumb-hierarchy-service-express
-title: The log signature as a hierarchy, domain → scope → step
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

@@ -1,6 +1,6 @@
 ---
 plan: retry-and-client-names-service
-title: Retry and the breaker exported, and every HTTP client named
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

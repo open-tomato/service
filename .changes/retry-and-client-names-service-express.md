@@ -1,6 +1,6 @@
 ---
 plan: retry-and-client-names-service-express
-title: Retry and the breaker exported, and every HTTP client named
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

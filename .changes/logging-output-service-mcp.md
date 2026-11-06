@@ -1,6 +1,6 @@
 ---
 plan: logging-output-service-mcp
-title: Where log lines go and what they carry
+title: MCP on the shared core, with stdio logs on stderr
 level: major
 package: @open-tomato/service-mcp
 ---

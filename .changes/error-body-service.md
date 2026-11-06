@@ -1,6 +1,6 @@
 ---
 plan: error-body-service
-title: One error body in the core, with the rule that builds it
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

@@ -1,6 +1,6 @@
 ---
 plan: error-handler-service-express
-title: Every Express error answered with the core's error body
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

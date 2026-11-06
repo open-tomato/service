@@ -1,6 +1,6 @@
 ---
 plan: control-operations-service
-title: Control operations as plain functions, token check on WebCrypto
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

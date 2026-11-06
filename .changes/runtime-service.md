@@ -1,6 +1,6 @@
 ---
 plan: runtime-service
-title: createRuntime, the lifecycle every adapter shares
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

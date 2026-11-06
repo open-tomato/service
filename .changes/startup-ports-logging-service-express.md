@@ -1,6 +1,6 @@
 ---
 plan: startup-ports-logging-service-express
-title: Startup ports, the startup banner and readable terminal logs
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

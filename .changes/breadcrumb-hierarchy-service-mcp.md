@@ -1,6 +1,6 @@
 ---
 plan: breadcrumb-hierarchy-service-mcp
-title: The log signature as a hierarchy, domain → scope → step
+title: MCP on the shared core, with stdio logs on stderr
 level: major
 package: @open-tomato/service-mcp
 ---

@@ -1,6 +1,6 @@
 ---
 plan: startup-ports-logging-service-mcp
-title: Startup ports, the startup banner and readable terminal logs
+title: MCP on the shared core, with stdio logs on stderr
 level: major
 package: @open-tomato/service-mcp
 ---

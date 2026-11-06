@@ -1,6 +1,6 @@
 ---
 plan: config-schema-service
-title: A base config schema in the core
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

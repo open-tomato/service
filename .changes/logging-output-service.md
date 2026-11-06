@@ -1,6 +1,6 @@
 ---
 plan: logging-output-service
-title: Where log lines go and what they carry
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

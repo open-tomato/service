@@ -1,6 +1,6 @@
 ---
 plan: logger-type-service
-title: The core owns its Logger type and drops pino
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

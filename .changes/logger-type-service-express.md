@@ -1,6 +1,6 @@
 ---
 plan: logger-type-service-express
-title: The core owns its Logger type and drops pino
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

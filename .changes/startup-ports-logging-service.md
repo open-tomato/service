@@ -1,6 +1,6 @@
 ---
 plan: startup-ports-logging-service
-title: Startup ports, the startup banner and readable terminal logs
+title: One core for every adapter
 level: major
 package: @open-tomato/service
 ---

@@ -1,6 +1,6 @@
 ---
 plan: logging-output-service-express
-title: Where log lines go and what they carry
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

@@ -1,6 +1,6 @@
 ---
 plan: breadcrumb-hierarchy-service-logger
-title: The log signature as a hierarchy, domain → scope → step
+title: Where log lines go and what they carry
 level: major
 package: @open-tomato/service-logger
 ---

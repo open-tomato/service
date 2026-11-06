@@ -1,6 +1,6 @@
 ---
 plan: banner-service-once-service-mcp
-title: The started line names the service once
+title: MCP on the shared core, with stdio logs on stderr
 level: major
 package: @open-tomato/service-mcp
 ---

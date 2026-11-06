@@ -1,6 +1,6 @@
 ---
 plan: banner-service-once-service-express
-title: The started line names the service once
+title: Express on the shared core
 level: major
 package: @open-tomato/service-express
 ---

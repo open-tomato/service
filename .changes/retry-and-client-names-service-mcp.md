@@ -1,6 +1,6 @@
 ---
 plan: retry-and-client-names-service-mcp
-title: Retry and the breaker exported, and every HTTP client named
+title: MCP on the shared core, with stdio logs on stderr
 level: major
 package: @open-tomato/service-mcp
 ---
