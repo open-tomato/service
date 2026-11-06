@@ -54,6 +54,9 @@ export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from
 export { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
 export type { PickedPort, PickPortOptions, PortRange } from './ports.js';
 
+export { logStarted, STARTED_MESSAGE } from './banner.js';
+export type { BannerFeatureValue, StartupBanner } from './banner.js';
+
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 

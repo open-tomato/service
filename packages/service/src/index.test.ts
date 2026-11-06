@@ -2,6 +2,7 @@ import type { CircuitState } from './index.js';
 
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import { logStarted, STARTED_MESSAGE } from './banner.js';
 import { CircuitBreaker } from './circuit-breaker.js';
 import * as control from './control.js';
 import * as errorClient from './error-client.js';
@@ -65,6 +66,11 @@ describe('public exports', () => {
     expect(core.pickPort).toBe(pickPort);
     expect(core.PORT_FALLBACK_RANGE).toBe(PORT_FALLBACK_RANGE);
     expect(core.PortInUseError).toBe(PortInUseError);
+  });
+
+  it('exports the startup banner', () => {
+    expect(core.logStarted).toBe(logStarted);
+    expect(core.STARTED_MESSAGE).toBe(STARTED_MESSAGE);
   });
 
   it('exports the CircuitState type', () => {
