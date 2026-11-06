@@ -168,6 +168,40 @@ server run by hand in a terminal prints readable lines whatever its
 environment. Setting `NO_COLOR` to any non-empty value turns colour off in
 the terminal format.
 
+A tool handler's logger comes from `ctx.logger`, which `setup` receives. Chain
+`scoped(inDomain(logger, 'Notes'), 'search')` on it, with both helpers imported
+from `@open-tomato/service` (this package does not re-export them), and each
+record names the domain and the scope it was written under. A step goes in the
+context object of its call, `{ step: 'fetch' }`, and is never bound: a step
+bound on a child would stick to every later record. The `debug` step below
+follows the level rule of the service logger's README: routine steps are
+`trace` or `debug`, and only the key steps of the critical path are `info`.
+
+```ts
+import { z } from 'zod';
+
+import { inDomain, scoped } from '@open-tomato/service';
+import { createMCP } from '@open-tomato/service-mcp';
+
+createMCP({
+  serviceId: 'notes',
+  setup(server, { logger }) {
+    const log = scoped(inDomain(logger, 'Notes'), 'search');
+    server.registerTool(
+      'search_notes',
+      { description: 'Search the notes', inputSchema: { query: z.string() } },
+      async ({ query }) => {
+        log.debug({ step: 'fetch', query }, 'notes requested');
+        return { content: [{ type: 'text', text: '' }] };
+      },
+    );
+  },
+});
+```
+
+The `fetch` record draws `Notes:search:fetch`, so the line says which call
+wrote it.
+
 ## Configuration
 
 | Field | Default | Meaning |
