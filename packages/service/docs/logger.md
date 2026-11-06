@@ -33,7 +33,8 @@ log.info({ step: 'insert', userId: 'u-1' }, 'user created');
 `inDomain` and `scoped` both return a child, and a child's bindings win
 over its parent's: calling `inDomain` on a domain logger replaces the domain
 and keeps the trace id and the scope, and scoping a scoped logger replaces
-the scope and keeps the trace id and the domain. Neither touches the logger it was given.
+the scope and keeps the trace id and the domain. Neither touches the logger
+it was given.
 
 ## Case convention
 
