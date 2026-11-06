@@ -42,6 +42,21 @@ describe('logStarted', () => {
     expect(calls[0]?.args[0]).not.toHaveProperty('fallbackPort');
   });
 
+  it('leaves url out when it is not set', () => {
+    const { calls, logger } = recordingLogger();
+    const stdio = {
+      service: base.service,
+      version: base.version,
+      transport: 'stdio',
+      features: base.features,
+    };
+
+    logStarted(logger, stdio);
+
+    expect(calls[0]?.args[0]).not.toHaveProperty('url');
+    expect(calls[0]?.args[0]).toStrictEqual(stdio);
+  });
+
   it('keeps the named fields over extra fields of the same name', () => {
     const { calls, logger } = recordingLogger();
 

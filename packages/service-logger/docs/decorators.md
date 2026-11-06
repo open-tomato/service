@@ -72,9 +72,10 @@ record keeps it.
 ## The startup banner
 
 A record whose message is `started` (the core's `STARTED_MESSAGE`) and which
-carries a string `url` is the banner `logStarted` writes. It is drawn as a
-head line and one row per field: `version`, `transport`, `url`, `features`
-and `fallbackPort` first, then any extra field.
+carries a string `transport` is the banner `logStarted` writes. It is drawn as
+a head line and one row per field: `version`, `transport`, `url`, `features`
+and `fallbackPort` first, then any extra field. The check keys on `transport`,
+which every banner carries, and not on `url`, which a banner may leave out.
 
 ```text
 12:04:31.250 INFO  orders  started
@@ -86,8 +87,18 @@ and `fallbackPort` first, then any extra field.
   healthUrl     http://localhost:3002
 ```
 
-`features` with no entry reads `none`. A `started` message with no `url` is
-an ordinary record and gets an ordinary line.
+A banner with no `url`, as a stdio server writes, has no `url` row:
+
+```text
+12:04:31.250 INFO  orders  started
+  version    1.2.3
+  transport  stdio
+  features   none
+```
+
+`features` with no entry reads `none`. A `started` message with no string
+`transport` is an ordinary record and gets an ordinary line, even when it
+carries a `url`.
 
 ## Colour
 
@@ -106,7 +117,8 @@ pino logger writes with the `errWithCause` serializer for `err`: a record
 with and without trace id and signature, the signature at all three levels,
 at two, at the domain alone and at none, none of its levels repeated as a
 field, a child of `inDomain` with a bound `scope`, an error with two nested
-causes, the banner `logStarted` writes, and `NO_COLOR` set, empty
+causes, the banner `logStarted` writes, with and without `url`, a `started`
+record with a `url` and no `transport`, and `NO_COLOR` set, empty
 and unset. Breaking the cause walk, the trace id length, the signature order
 or its slot keys, the banner check, the list of pino's own keys or either
 branch of the colour pick each makes a test fail.

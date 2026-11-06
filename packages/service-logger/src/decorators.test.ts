@@ -185,10 +185,30 @@ describe('terminal', () => {
     ].join('\n'));
   });
 
-  it('draws a started message with no url as an ordinary line', () => {
-    const input = line({ service: 'worker', msg: 'started', jobs: 3 });
+  it('draws a stdio started record with no url as a banner with no url row', () => {
+    const lines: string[] = [];
 
-    expect(terminal(input)).toBe(`${CLOCK} INFO  worker  started  jobs=3\n`);
+    logStarted(capturingPino(lines), {
+      service: 'orders',
+      version: '1.2.3',
+      transport: 'stdio',
+      features: {},
+    });
+    const drawn = terminal(lines[0] ?? '').split('\n');
+
+    expect(drawn[0]).toMatch(/^\d\d:\d\d:\d\d\.\d{3} INFO {2}orders {2}started$/);
+    expect(drawn.slice(1)).toEqual([
+      '  version    1.2.3',
+      '  transport  stdio',
+      '  features   none',
+      '',
+    ]);
+  });
+
+  it('draws a started message with no transport as an ordinary line', () => {
+    const input = line({ service: 'worker', msg: 'started', url: 'http://localhost:3001', jobs: 3 });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  worker  started  url=http://localhost:3001  jobs=3\n`);
   });
 
   it('passes a line that is not a JSON object through', () => {

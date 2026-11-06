@@ -240,8 +240,9 @@ function errorLines(err: unknown, paint: Paint): string[] {
   return lines;
 }
 
+/** The `started` record `logStarted` writes: message `started` and a string `transport`. */
 function isBanner(record: LogRecord): boolean {
-  return record.msg === STARTED_MESSAGE && typeof record.url === 'string';
+  return record.msg === STARTED_MESSAGE && typeof record.transport === 'string';
 }
 
 function formatFeatures(features: unknown): string {
