@@ -29,8 +29,10 @@ requestLogger.warn({ attempt: 2 }, 'retrying the payment call');
 
 Every record carries `service: 'orders'` and the `context` fields, so a log
 aggregator can filter by service. The level comes from `options.level`,
-then `LOG_LEVEL`, then `info`. Records print as JSON, or pretty-printed when
-`options.pretty` is set or `NODE_ENV=development`.
+then `LOG_LEVEL`, then `info`. Records print as one readable line each when
+stdout is a terminal, and as JSON when it is a pipe or a file; `options.format`
+or `LOG_FORMAT` (`terminal` or `json`) picks one outright. `NO_COLOR` turns
+colour off on the terminal.
 
 The browser build has the same `createLogger(name, options)` and the same
 `Logger` interface; bundlers pick it through the package's `browser` export
@@ -69,7 +71,8 @@ With Express, pass it to `app.use(httpLogger)`.
 |---|---|---|
 | `level` | `LOG_LEVEL`, then `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent` |
 | `context` | none | fields added to every record |
-| `pretty` | `NODE_ENV=development` | human-readable output, through `pino-pretty` |
+| `format` | `LOG_FORMAT`, then `pretty`, then `terminal` on a TTY and `json` otherwise | `terminal` for readable lines, `json` for pino's records |
+| `pretty` | none | deprecated: `true` is `format: 'terminal'`, `false` is `format: 'json'` |
 
 | `createHttpLogger` option | Default | Meaning |
 |---|---|---|

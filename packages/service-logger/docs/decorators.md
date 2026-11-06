@@ -92,6 +92,7 @@ test fail.
 ## Where it is used
 
 The decorators are internal to the package: neither is exported from its
-entry. A caller hands `terminal` one pino line and writes the text it
+entry. `createLogger`'s terminal channel writes through `terminal`
+(`docs/node.md`). A caller hands `terminal` one pino line and writes the text it
 returns, so `terminal(line)` for a record of `orders` saying `ready` at
 noon gives `12:00:00.000 INFO  orders  ready` and a newline.

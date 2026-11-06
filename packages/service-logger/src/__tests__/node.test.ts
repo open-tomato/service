@@ -24,7 +24,7 @@ describe('createLogger — node entry', () => {
   });
 
   it('includes service binding in log output', () => {
-    const logger = createLogger('x');
+    const logger = createLogger('x', { format: 'json' });
     logger.info({}, 'msg');
 
     expect(stdoutChunks.length).toBeGreaterThan(0);
@@ -52,7 +52,7 @@ describe('createLogger — child logger', () => {
   });
 
   it('inherits service binding from parent', () => {
-    const parent = createLogger('my-service');
+    const parent = createLogger('my-service', { format: 'json' });
     const child = parent.child({ requestId: 'abc' });
 
     child.info({}, 'child msg');
@@ -67,7 +67,7 @@ describe('createLogger — child logger', () => {
 
 describe('createHttpLogger — req.log attachment', () => {
   it('attaches req.log as a child logger on each request', () => {
-    const logger = createLogger('test-service');
+    const logger = createLogger('test-service', { format: 'json' });
     const middleware = createHttpLogger({ logger });
 
     const req = Object.assign(Object.create(null), {
@@ -249,7 +249,7 @@ describe('createLogger — level option suppression', () => {
   });
 
   it('does not emit log lines below the configured level', () => {
-    const logger = createLogger('svc', { level: 'warn' });
+    const logger = createLogger('svc', { level: 'warn', format: 'json' });
 
     logger.trace({}, 'trace msg');
     logger.debug({}, 'debug msg');
@@ -259,7 +259,7 @@ describe('createLogger — level option suppression', () => {
   });
 
   it('emits log lines at or above the configured level', () => {
-    const logger = createLogger('svc', { level: 'warn' });
+    const logger = createLogger('svc', { level: 'warn', format: 'json' });
 
     logger.warn({}, 'warn msg');
 
@@ -298,7 +298,7 @@ describe('createLogger — LOG_LEVEL env var', () => {
     vi.resetModules();
 
     const { createLogger: createLoggerFresh } = await import('../node.js');
-    const logger = createLoggerFresh('svc');
+    const logger = createLoggerFresh('svc', { format: 'json' });
 
     logger.info({}, 'this should be suppressed');
     expect(stdoutChunks.length).toBe(0);

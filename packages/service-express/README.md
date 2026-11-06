@@ -161,7 +161,8 @@ constant time.
 | `formatError` | the core's `toErrorResponse` | `(error) => { status, body }`, for an error body of your own |
 
 `createService` resolves to `{ app, stop() }`. The logger reads `LOG_LEVEL`
-(default `info`), and pretty-prints when `NODE_ENV=development`.
+(default `info`), and writes readable lines when stdout is a terminal and JSON
+otherwise; `LOG_FORMAT` (`terminal` or `json`) picks one outright.
 
 ## Requirements
 
