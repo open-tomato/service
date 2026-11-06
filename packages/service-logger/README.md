@@ -43,7 +43,7 @@ A record is written in one of two formats:
 - `terminal` draws one readable line for a person, coloured by level:
 
   ```text
-  12:04:31.250 INFO  orders  3f2a9c1e  Users:create  user created  userId=42
+  12:04:31.250 INFO  orders  3f2a9c1e  Users:create:insert  user created  userId=42
   ```
 
 - `json` writes pino's record unchanged, one JSON object per line, for a log
@@ -84,22 +84,47 @@ one request read as a path through the code:
   order into one signature slot: `Users:create:insert` for all three,
   `Users:create` for a domain and a scope, `Users` for the domain alone.
 
-Bind them with `child`. The core's `inDomain(logger, 'Users')` and
-`scoped(logger, 'create')`, from `@open-tomato/service`, set the domain and
-the scope for you. A record with neither slot
-draws no placeholder.
+A record with none of the three draws no placeholder. Each level is set where
+its value is known:
+
+- the domain, when a domain's logger is made: `inDomain(logger, 'Users')`;
+- the scope, at an entry point of a file's workflow: `scoped(log, 'create')`,
+  with one argument. Scoping again replaces the scope and keeps the domain;
+- the step, in the context object of each call: `{ step: 'insert' }`. It is
+  never bound. A step bound with `child` would stick to every later record
+  that child writes.
+
+`inDomain` and `scoped` are the core's helpers, imported from
+`@open-tomato/service`, and they bind `domain` and `scope` through `child`.
+The example below imports them from there and the logger from this package:
 
 ```ts
+import { inDomain, scoped } from '@open-tomato/service';
 import { createLogger } from '@open-tomato/service-logger';
 
-const logger = createLogger('orders');
-const scopedLogger = logger.child({
-  traceId: '3f2a9c1e5d6b4a',
-  domain: 'Users',
-  scope: 'create',
-});
-scopedLogger.info({ userId: 42 }, 'user created');
+const logger = createLogger('orders').child({ traceId: '3f2a9c1e5d6b4a' });
+const users = inDomain(logger, 'Users');
+
+export function createUser(userId: number): void {
+  const log = scoped(users, 'create');
+  log.debug({ step: 'validate', userId }, 'user input checked');
+  log.info({ step: 'insert', userId }, 'user created');
+}
 ```
+
+The `insert` record above draws `Users:create:insert`, so the line says exactly
+which call wrote it. The `validate` record draws `Users:create:validate`.
+
+Each step gets a level by one rule:
+
+- `trace` or `debug` for a routine step, so most steps of a flow get one;
+- `info` only for a key step on the use case's critical path: the records a
+  persisted traceability destination keeps;
+- `warn` or `error` for a step that failed.
+
+Keeping `scope` as `<Module>:<action>` and adding `step` beside it was
+rejected: it binds two levels at one moment, while the domain is known earlier
+than the entry point.
 
 ## An HTTP request logger
 
