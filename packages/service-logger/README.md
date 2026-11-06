@@ -131,8 +131,9 @@ than the entry point.
 `createHttpLogger` returns [pino-http](https://www.npmjs.com/package/pino-http)
 middleware for Express or `node:http`. It redacts the `authorization`,
 `cookie` and `x-api-key` headers, gives each request an id (the
-`x-request-id` header when present), and skips routes under `/_health` and
-`/_control`.
+`x-request-id` header when it is one to 64 characters of `[A-Za-z0-9._:-]`,
+else a new UUID) that `req.log` binds as `traceId`, and skips routes under
+`/_health` and `/_control`.
 
 ```ts
 import { createServer } from 'node:http';

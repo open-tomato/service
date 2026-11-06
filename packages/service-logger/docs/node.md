@@ -53,6 +53,24 @@ set to a non-empty value.
 `stack` and `cause`. The `json` record carries that shape, and the terminal
 decorator draws one `<type>: <message>` line per link of it.
 
+## The request logger
+
+`createHttpLogger` gives each request an id: its `x-request-id` header when
+`isTraceId` from `@open-tomato/service` accepts it, one to 64 characters of
+`[A-Za-z0-9._:-]`, else `randomUUID()`. A header with a space, of 65
+characters or empty is replaced, not trimmed. The id is `req.id`, and
+pino-http runs with `quietReqLogger: true` and
+`customAttributeKeys: { reqId: TRACE_ID_FIELD }`, so `req.log` binds only
+`traceId`. A crumb logged through `req.log` carries `traceId` and no `req`.
+The completion line is a child of that logger with `req` bound, so it
+carries `traceId` once, beside `req`, `res` and `responseTime`. No
+`requestId` field is written; it was the `customProps` binding before, and
+would have put a second id key on the completion line.
+A `logger` passed in that already binds `traceId` keeps that binding, and
+pino-http adds its own under the same key, so its lines carry `"traceId"`
+twice and a JSON parser reads the request's id, the last one. Bind the id
+through `x-request-id`, not on the logger.
+
 ## How it is tested
 
 `src/__tests__/node-format.test.ts` fakes `process.stdout.isTTY` with
@@ -78,3 +96,10 @@ Inside a vitest worker `process.stdout.isTTY` is `undefined` whether or not
 the run sits in a terminal, so a test that reads stdout as JSON pins
 `format: 'json'` rather than relying on the worker's stdout; the tests in
 `src/__tests__/node.test.ts` do.
+
+`src/__tests__/node.test.ts` also drives `createHttpLogger` with a fake
+request and a response that emits `finish`. It checks that a valid
+`x-request-id`, 64 characters included, is kept; that one with a space, of
+65 characters or empty is replaced by a UUID; that a crumb through `req.log`
+has `traceId` and no `req` or `requestId`; and that the raw completion line
+holds the `"traceId"` key once, with `req`, `res` and `responseTime`.

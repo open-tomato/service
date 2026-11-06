@@ -61,10 +61,10 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
   }
 
   function logRequest(): void {
-    const logger = createLogger('orders').child({ traceId: TRACE_ID, domain: DOMAIN, scope: SCOPE });
+    const logger = createLogger('orders').child({ domain: DOMAIN, scope: SCOPE });
     const middleware = createHttpLogger({ logger });
     const req = Object.assign(Object.create(null), {
-      headers: {},
+      headers: { 'x-request-id': TRACE_ID },
       method: 'GET',
       url: '/api/test',
       socket: { remoteAddress: '127.0.0.1' },
