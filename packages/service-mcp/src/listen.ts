@@ -1,4 +1,4 @@
-import type { PickedPort, PickPortOptions } from '@open-tomato/service';
+import type { Logger, PickedPort, PickPortOptions } from '@open-tomato/service';
 import type { Server } from 'node:net';
 
 import { createServer } from 'node:net';
@@ -103,6 +103,32 @@ export async function listenOnPickedPort(
     }
   }
   throw new PortInUseError({ port: lastPort, configKey: rule.configKey, cause: lastError });
+}
+
+/** The config key and environment variable that make a taken port an error instead of a fallback. */
+export interface StrictNames {
+  /** The config key, such as `strictPort` or `health.strictPort`. */
+  readonly strictKey: string;
+  /** The environment variable, such as `PORT_STRICT` or `HEALTH_PORT_STRICT`. */
+  readonly strictEnv: string;
+}
+
+/**
+ * Logs a `warn` record when `pick` fell back from the asked port, naming the
+ * taken port, the port bound instead, and the config key and variable that
+ * turn the fallback into an error. A pick that did not fall back logs nothing.
+ *
+ * @param logger - The logger to write the record to.
+ * @param pick - The pick `listenOnPickedPort` made.
+ * @param names - The strict config key and environment variable to name.
+ */
+export function warnOnFallback(logger: Logger, pick: PickedPort, names: StrictNames): void {
+  if (!pick.fellBack) return;
+  const { strictKey, strictEnv } = names;
+  logger.warn(
+    { takenPort: pick.requested, port: pick.port, strictKey, strictEnv },
+    `port ${pick.requested} is taken, falling back to ${pick.port}; set ${strictKey} or ${strictEnv}=true to fail instead`,
+  );
 }
 
 /** The port the HTTP transport listens on when neither the config nor `PORT` names one. */

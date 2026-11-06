@@ -25,6 +25,12 @@ taken port the same way.
   any whitespace. An empty port variable counts as unset, and one that is
   not a whole number throws a `RangeError` naming the variable. `env`
   defaults to `process.env`.
+- `warnOnFallback(logger, pick, names)` logs one `warn` record when a pick
+  fell back, with `takenPort`, the bound `port`, and the `strictKey` and
+  `strictEnv` that turn the fallback into an error, and a message reading
+  `port <taken> is taken, falling back to <port>; set <strictKey> or
+  <strictEnv>=true to fail instead`, the Express adapter's wording. A pick
+  that did not fall back logs nothing. A caller passes it as `onPicked`.
 
 ## Why the schema leaves the ports unset
 

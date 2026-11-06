@@ -114,7 +114,7 @@ export function createMCP(config: MCPConfig): MCPHandle {
     | Awaited<ReturnType<typeof wireHttpTransport>>
     | Awaited<ReturnType<typeof wireStdioTransport>>
     | null = null;
-  let healthServer: ReturnType<typeof startHealthServer> | null = null;
+  let healthServer: Awaited<ReturnType<typeof startHealthServer>> | null = null;
 
   /**
    * Initialises the server: invokes `setup`, wires the transport, and starts
@@ -127,8 +127,10 @@ export function createMCP(config: MCPConfig): MCPHandle {
 
     if (transport === 'http') {
       transportInstance = await wireHttpTransport(server, ports.port);
-      healthServer = startHealthServer({
+      healthServer = await startHealthServer({
         port: ports.health.port,
+        strict: ports.health.strict,
+        logger,
         path: resolved.health.path,
         serviceId: resolved.serviceId,
         clients: resolved.clients,

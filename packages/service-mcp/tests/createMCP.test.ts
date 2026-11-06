@@ -45,7 +45,7 @@ vi.mock('../src/transport.js', () => ({
 }));
 
 vi.mock('../src/health.js', () => ({
-  startHealthServer: vi.fn().mockReturnValue(mocks.mockHealthServerInstance),
+  startHealthServer: vi.fn().mockResolvedValue(mocks.mockHealthServerInstance),
   buildHealthResponse: vi.fn(),
 }));
 
@@ -200,9 +200,9 @@ describe('createMCP', () => {
     });
 
     let healthCalledAfterTransport = false;
-    vi.mocked(startHealthServer).mockImplementationOnce(() => {
+    vi.mocked(startHealthServer).mockImplementationOnce(async () => {
       healthCalledAfterTransport = transportResolved;
-      return mocks.mockHealthServerInstance;
+      return mocks.mockHealthServerInstance as unknown as Awaited<ReturnType<typeof startHealthServer>>;
     });
 
     createMCP(makeConfig());
