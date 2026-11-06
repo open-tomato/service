@@ -51,6 +51,9 @@ export type { ApiError } from './error-client.js';
 export { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
 export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from './schema.js';
 
+export { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
+export type { PickedPort, PickPortOptions, PortRange } from './ports.js';
+
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 

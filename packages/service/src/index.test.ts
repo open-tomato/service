@@ -8,6 +8,7 @@ import * as errorClient from './error-client.js';
 import * as errorResponse from './error-response.js';
 import * as errors from './errors.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
+import { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
 import { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
@@ -58,6 +59,12 @@ describe('public exports', () => {
     expect(core.zodToValidationError).toBe(errorResponse.zodToValidationError);
     expect(core.isErrorBody).toBe(errorClient.isErrorBody);
     expect(core.parseApiError).toBe(errorClient.parseApiError);
+  });
+
+  it('exports the port rule and its error', () => {
+    expect(core.pickPort).toBe(pickPort);
+    expect(core.PORT_FALLBACK_RANGE).toBe(PORT_FALLBACK_RANGE);
+    expect(core.PortInUseError).toBe(PortInUseError);
   });
 
   it('exports the CircuitState type', () => {
