@@ -327,6 +327,43 @@ The level comes from `options.level`, then `LOG_LEVEL`, then `info`. An
 `Error` passed as the first argument lands under `err`, so its message and
 stack survive.
 
+### Breadcrumbs
+
+A record can say where it was written. `inDomain` binds the domain once,
+when a domain's logger is made; `scoped` binds the scope at the entry point
+of a file's workflow; each call passes its step in the context object.
+The record then names the exact place a step was called from.
+
+```ts
+import { createConsoleLogger, inDomain, scoped } from '@open-tomato/service';
+
+const users = inDomain(createConsoleLogger('users'), 'Users');
+
+function create(userId: string): void {
+  const log = scoped(users, 'create');
+  log.debug({ step: 'validate', userId }, 'checking the user');
+  log.info({ step: 'insert', userId }, 'user created');
+  // carries domain: 'Users', scope: 'create', step: 'insert'
+}
+
+create('42');
+```
+
+- **Case.** The domain is PascalCase, such as `Users`; the scope and the
+  step are camelCase, such as `create` and `insert`.
+- **The step is never bound.** It goes in the call's context object. A step
+  bound on a child would stick to every record that logger writes after it.
+- **Levels.** `trace` and `debug` suit the routine steps of a flow, so most
+  steps get one of those; `info` marks only the key steps on the use case's
+  critical path; `warn` and `error` mark a step that failed.
+- **Why not `<Module>:<action>`.** Keeping the scope as one `Module:action`
+  string and adding a step would bind two levels at one moment, while the
+  domain is known earlier than the entry point.
+
+The field names are constants, `DOMAIN_FIELD`, `SCOPE_FIELD`, `STEP_FIELD`
+and `TRACE_ID_FIELD`, and `LogBreadcrumb` types the four fields a record may
+carry. Read a record's fields through them, never as string literals.
+
 ## Exports
 
 | Export | What it is |
@@ -350,6 +387,10 @@ stack survive.
 | `BaseServiceConfigSchema`, `ControlConfigSchema` | the zod schemas for the shared config and its `control` field |
 | `BaseServiceConfig`, `ResolvedBaseServiceConfig`, `ControlConfig` | the config as written, the config once parsed, and the `control` field |
 | `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
+| `inDomain(logger, domain)` | a child logger whose records carry `domain`, in PascalCase, such as `Users` |
+| `scoped(logger, scope)` | a child logger whose records carry `scope`, in camelCase, such as `create` |
+| `TRACE_ID_FIELD`, `DOMAIN_FIELD`, `SCOPE_FIELD`, `STEP_FIELD` | the record field names the breadcrumb uses; read them, never the literal strings |
+| `LogBreadcrumb` | the breadcrumb fields a record may carry: trace id, domain, scope and step |
 | `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |
 
