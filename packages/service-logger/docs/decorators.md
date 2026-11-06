@@ -12,25 +12,45 @@ and ends with a newline, into the text written for it. There are two.
 One line per record, in this slot order:
 
 ```text
-12:04:31.250 INFO  orders  3f2a9c1e  Users:create  user created  userId=42
+12:04:31.250 INFO  orders  3f2a9c1e  Users:create:insert  user created  userId=42
 ```
 
 - the time as local `HH:MM:SS.mmm`;
 - the level as an upper-case word padded to five, coloured by level;
 - `service`;
 - the first 8 characters of the trace id;
-- the scope, `<Module>:<action>`;
+- the signature: the present `domain`, `scope` and `step` joined by `:` in
+  that order, as `Users:create:insert`. A missing level leaves no empty
+  separator, so a record with a domain and a scope reads `Users:create` and
+  one with the domain alone reads `Users`; none of the three is repeated as a
+  `key=value` field;
 - the message;
 - every other field as `key=value`. A string with a space, `=` or `"` is
   quoted, and an object or array is written as JSON.
 
 The time and the level are each followed by one space, so the level word
 lines up in a column; the slots after it are two spaces apart. A missing
-`service`, trace id, scope or message drops its slot with no placeholder.
+`service`, trace id, signature or message drops its slot with no placeholder:
+a record with no `domain`, `scope` or `step` has no signature slot.
 pino's own keys (`time`, `level`, `pid`, `hostname`, `msg`) are not repeated
-as fields. The trace id and scope are read through the core's
-`TRACE_ID_FIELD` and `SCOPE_FIELD`, so a rename in the core reaches the
-decorator.
+as fields. The trace id and the three signature levels are read through the
+core's `TRACE_ID_FIELD`, `DOMAIN_FIELD`, `SCOPE_FIELD` and `STEP_FIELD`, so a
+rename in the core reaches the decorator.
+
+Each signature level is set where its value is known. The domain is bound when
+a domain's logger is made, `inDomain(logger, 'Users')`. The scope is bound at
+an entry point of a file's workflow, `scoped(log, 'create')`, with one
+argument. The step goes in the context object of each call, as
+`{ step: 'insert' }`, and is never bound: a step bound with `child` would stick
+to every later record that child writes. The terminal line above is therefore
+the `insert` record of `Users`, `create`, and it draws `Users:create:insert`.
+
+Each step takes a level by one rule:
+
+- `trace` or `debug` for a routine step, so most steps of a flow get one;
+- `info` only for a key step on the use case's critical path, the records a
+  persisted traceability destination keeps;
+- `warn` or `error` for a step that failed.
 
 ## Errors
 
@@ -83,11 +103,13 @@ when it has none.
 `src/decorators.test.ts` runs with `NO_COLOR` stubbed so it can compare whole
 lines. It feeds hand-built lines with a fixed local time, and lines a real
 pino logger writes with the `errWithCause` serializer for `err`: a record
-with and without trace id and scope, a scoped child, an error with
-two nested causes, the banner `logStarted` writes, and `NO_COLOR` set, empty
-and unset. Breaking the cause walk, the trace id length, the banner check,
-the list of pino's own keys or either branch of the colour pick each makes a
-test fail.
+with and without trace id and signature, the signature at all three levels,
+at two, at the domain alone and at none, none of its levels repeated as a
+field, a child of `inDomain` with a bound `scope`, an error with two nested
+causes, the banner `logStarted` writes, and `NO_COLOR` set, empty
+and unset. Breaking the cause walk, the trace id length, the signature order
+or its slot keys, the banner check, the list of pino's own keys or either
+branch of the colour pick each makes a test fail.
 
 ## Where it is used
 

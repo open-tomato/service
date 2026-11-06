@@ -1,5 +1,6 @@
 import type { LoggerOptions } from '../types.js';
 
+import { inDomain } from '@open-tomato/service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createLogger } from '../node.js';
@@ -148,12 +149,26 @@ describe('createLogger — format pick', () => {
 
   it('keeps the terminal channel for a child and writes before the call returns', () => {
     fakeIsTTY(true);
-    const child = createLogger('orders').child({ traceId: '3f2a9c1e5d6b4a', scope: 'Users:create' });
+    const child = createLogger('orders').child({ traceId: '3f2a9c1e5d6b4a', domain: 'Users', scope: 'create' });
 
     child.warn('slow');
 
     expect(chunks).toHaveLength(1);
     expect(chunks[0]).toMatch(/^\d\d:\d\d:\d\d\.\d{3} WARN {2}orders {2}3f2a9c1e {2}Users:create {2}slow\n$/);
+  });
+
+  it('draws the step in the signature for one call and drops it on the next', () => {
+    fakeIsTTY(true);
+    const child = inDomain(createLogger('orders'), 'Users')
+      .child({ traceId: '3f2a9c1e5d6b4a', scope: 'create' });
+
+    child.info({ step: 'insert' }, 'user created');
+    child.info('next');
+
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]).toMatch(/ {2}Users:create:insert {2}user created\n$/);
+    expect(chunks[1]).toMatch(/ {2}Users:create {2}next\n$/);
+    expect(chunks[1]).not.toContain('step');
   });
 });
 

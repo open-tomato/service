@@ -165,27 +165,34 @@ a new UUID. The response answers with the same `x-request-id`, and `req.log`
 binds the id as `traceId`, so every record a route writes through `req.log`
 carries it. A terminal line shows the first 8 characters of it.
 
-A logger from `scoped(logger, module, action)`, imported from
-`@open-tomato/service` (this package does not re-export it), adds a `scope`
-such as `Orders:create` to each record it writes, so a line names the code
-that wrote it:
+A logger from `scoped(inDomain(logger, 'Orders'), 'create')`, with both
+imported from `@open-tomato/service` (this package does not re-export them),
+adds `domain: 'Orders'` and `scope: 'create'` to each record it writes, so a
+line names the code that wrote it. Each step goes in the context object of its
+call, `{ step: 'insert' }`, and is never bound: a step bound on a child would
+stick to every later record. The `debug` and `info` steps below follow the level
+rule of the service logger's README:
 
 ```ts
-import { scoped } from '@open-tomato/service';
+import { inDomain, scoped } from '@open-tomato/service';
 import { createService } from '@open-tomato/service-express';
 
 await createService({
   serviceId: 'orders',
   register(app, { logger }) {
-    const log = scoped(logger, 'Orders', 'create');
+    const log = scoped(inDomain(logger, 'Orders'), 'create');
     app.post('/orders', (req, res) => {
       req.log.info('order request received');
-      log.info({ orderId: 'o-1' }, 'order created');
+      log.debug({ step: 'validate', orderId: 'o-1' }, 'order input checked');
+      log.info({ step: 'insert', orderId: 'o-1' }, 'order created');
       res.status(201).json({ orderId: 'o-1' });
     });
   },
 });
 ```
+
+The `validate` record draws `Orders:create:validate` and the `insert` record
+draws `Orders:create:insert`, so each line says which call wrote it.
 
 ## Errors
 

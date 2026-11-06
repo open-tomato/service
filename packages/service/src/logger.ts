@@ -129,34 +129,64 @@ export function createConsoleLogger(name: string, options: ConsoleLoggerOptions 
 /** The record field that carries the request's trace id. */
 export const TRACE_ID_FIELD = 'traceId';
 
-/** The record field that names the code that wrote it, as `<Module>:<action>`. */
+/** The record field that names the entry point of a file's workflow, such as `create`. */
 export const SCOPE_FIELD = 'scope';
 
-/** The breadcrumb fields a record may carry: its trace id and its scope. */
+/** The record field that names the domain the record belongs to, such as `Users`. */
+export const DOMAIN_FIELD = 'domain';
+
+/** The record field that names the step within a scope; set per call, never bound. */
+export const STEP_FIELD = 'step';
+
+/** The breadcrumb fields a record may carry: its trace id, domain, scope and step. */
 export interface LogBreadcrumb {
   /** The trace id of the request the record belongs to. */
   [TRACE_ID_FIELD]?: string
-  /** Where the record was written, as `<Module>:<action>`. */
+  /** The domain the record belongs to, in PascalCase, such as `Users`. */
+  [DOMAIN_FIELD]?: string
+  /** The entry point of a file's workflow, in camelCase, such as `create`. */
   [SCOPE_FIELD]?: string
+  /** The step within the scope, in camelCase, such as `insert`; passed in the call's fields. */
+  [STEP_FIELD]?: string
 }
 
 /**
- * Returns a child logger whose records carry `scope: '<module>:<action>'`.
+ * Returns a child logger whose records carry `domain`.
  *
- * A child's bindings win over its parent's, so scoping a scoped logger
- * replaces the scope rather than adding a second one.
+ * A child's bindings win over its parent's, so calling it on a domain logger
+ * replaces the domain and keeps every other binding.
  *
- * @param logger - The logger to scope.
- * @param module - The module name, such as `Users`.
- * @param action - The action within it, such as `create`.
+ * @param logger - The logger to bind the domain on.
+ * @param domain - The domain name, in PascalCase, such as `Users`.
  * @returns The child {@link Logger}.
  *
  * @example
  * ```ts
- * const log = scoped(createConsoleLogger('users'), 'Users', 'create');
- * log.info('user created'); // carries scope: 'Users:create'
+ * const log = inDomain(createConsoleLogger('users'), 'Users');
+ * log.info({ step: 'insert' }, 'user created'); // carries domain: 'Users', step: 'insert'
  * ```
  */
-export function scoped(logger: Logger, module: string, action: string): Logger {
-  return logger.child({ [SCOPE_FIELD]: `${module}:${action}` });
+export function inDomain(logger: Logger, domain: string): Logger {
+  return logger.child({ [DOMAIN_FIELD]: domain });
+}
+
+/**
+ * Returns a child logger whose records carry `scope`.
+ *
+ * The scope names the entry point of a file's workflow; the domain comes from
+ * {@link inDomain}. A child's bindings win over its parent's, so scoping a
+ * scoped logger replaces the scope and keeps the domain and the trace id.
+ *
+ * @param logger - The logger to scope.
+ * @param scope - The entry point, in camelCase, such as `create`.
+ * @returns The child {@link Logger}.
+ *
+ * @example
+ * ```ts
+ * const log = scoped(inDomain(createConsoleLogger('users'), 'Users'), 'create');
+ * log.info({ step: 'insert' }, 'user created'); // carries domain: 'Users', scope: 'create', step: 'insert'
+ * ```
+ */
+export function scoped(logger: Logger, scope: string): Logger {
+  return logger.child({ [SCOPE_FIELD]: scope });
 }

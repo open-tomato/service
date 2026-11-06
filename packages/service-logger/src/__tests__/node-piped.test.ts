@@ -2,12 +2,14 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { EventEmitter } from 'node:events';
 
+import { inDomain } from '@open-tomato/service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createHttpLogger, createLogger } from '../node.js';
 
 const TRACE_ID = '3f2a9c1e-aaaa-bbbb-cccc-000000000000';
-const SCOPE = 'Users:create';
+const DOMAIN = 'Users';
+const SCOPE = 'create';
 
 const originalIsTTY = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
 
@@ -54,12 +56,12 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
   });
 
   function logOnce(): void {
-    createLogger('orders').child({ traceId: TRACE_ID, scope: SCOPE })
-      .info({ userId: 42 }, 'user created');
+    inDomain(createLogger('orders'), DOMAIN).child({ traceId: TRACE_ID, scope: SCOPE })
+      .info({ step: 'insert', userId: 42 }, 'user created');
   }
 
   function logRequest(): void {
-    const logger = createLogger('orders').child({ traceId: TRACE_ID, scope: SCOPE });
+    const logger = createLogger('orders').child({ traceId: TRACE_ID, domain: DOMAIN, scope: SCOPE });
     const middleware = createHttpLogger({ logger });
     const req = Object.assign(Object.create(null), {
       headers: {},
@@ -81,11 +83,12 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
     const parsed = JSON.parse(chunk!) as Record<string, unknown>;
     expect(parsed['service']).toBe('orders');
     expect(parsed['traceId']).toBe(TRACE_ID);
+    expect(parsed['domain']).toBe(DOMAIN);
     expect(parsed['scope']).toBe(SCOPE);
     return parsed;
   }
 
-  it('writes JSON with traceId and scope as plain fields on a piped stdout', () => {
+  it('writes JSON with traceId, domain and scope as plain fields on a piped stdout', () => {
     fakeIsTTY(false);
     logOnce();
 
@@ -95,7 +98,18 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
     expect(parsed['userId']).toBe(42);
   });
 
-  it('writes JSON with traceId and scope through createHttpLogger on a piped stdout', () => {
+  it('keeps traceId, domain, scope and step as four plain fields on a piped stdout', () => {
+    fakeIsTTY(false);
+    logOnce();
+
+    const parsed = expectJsonRecord(chunks[0]);
+    expect(parsed['step']).toBe('insert');
+    expect(parsed['domain']).toBe('Users');
+    expect(parsed['scope']).toBe('create');
+    expect(chunks[0]).not.toContain('Users:create');
+  });
+
+  it('writes JSON with traceId, domain and scope through createHttpLogger on a piped stdout', () => {
     fakeIsTTY(false);
     logRequest();
 
@@ -111,7 +125,7 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
     expect(() => JSON.parse(chunks[0]!)).toThrow();
     expect(chunks[0]).toContain('INFO');
     expect(chunks[0]).toContain('3f2a9c1e');
-    expect(chunks[0]).toContain(SCOPE);
+    expect(chunks[0]).toContain(`${DOMAIN}:${SCOPE}:insert`);
     expect(chunks[0]).toContain('user created');
     expect(chunks[0]).toContain('userId=42');
   });
