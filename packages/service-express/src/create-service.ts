@@ -155,7 +155,6 @@ export async function createService(config: ServiceConfig): Promise<ServiceHandl
   });
   const url = `http://localhost:${picked.port}`;
   logStarted(logger, {
-    service: resolved.serviceId,
     version: readServiceVersion(),
     transport: 'http',
     url,

@@ -28,7 +28,7 @@ describe('started record from a scoped child', () => {
     const logger = scoped(inDomain(createConsoleLogger('svc', { sink }), 'Server'), 'start');
 
     logStarted(logger, {
-      service: 'svc', version: '1.0.0', transport: 'http', url: 'http://localhost:3000', features: {},
+      version: '1.0.0', transport: 'http', url: 'http://localhost:3000', features: {},
     });
 
     expect(calls).toHaveLength(1);

@@ -90,6 +90,19 @@ describe('createMCP log destination', () => {
     expect(stdoutSpy).not.toHaveBeenCalled();
   });
 
+  it('writes the service name once on the started line, from the logger binding', async () => {
+    vi.mocked(resolveTransport).mockReturnValue('stdio');
+
+    const handle = createMCP(makeConfig());
+    await handle.ready();
+    await handle.stop();
+
+    const started = written(stderrSpy).split('\n')
+      .find(line => line.includes('"msg":"started"'));
+    expect(started).toBeDefined();
+    expect(started!.split('"service":')).toHaveLength(2);
+  });
+
   it('writes the setup line to stdout only on HTTP', async () => {
     const handle = createMCP(makeConfig());
     await handle.ready();

@@ -25,7 +25,6 @@ function recordingLogger() {
 }
 
 const base = {
-  service: 'users',
   version: '1.2.3',
   transport: 'http',
   url: 'http://localhost:3000',
@@ -45,7 +44,6 @@ describe('logStarted', () => {
   it('leaves url out when it is not set', () => {
     const { calls, logger } = recordingLogger();
     const stdio = {
-      service: base.service,
       version: base.version,
       transport: 'stdio',
       features: base.features,
@@ -60,8 +58,17 @@ describe('logStarted', () => {
   it('keeps the named fields over extra fields of the same name', () => {
     const { calls, logger } = recordingLogger();
 
-    logStarted(logger, { ...base, extra: { service: 'other', healthUrl: 'http://localhost:3001' } });
+    logStarted(logger, { ...base, extra: { transport: 'other', healthUrl: 'http://localhost:3001' } });
 
+    expect(calls[0]?.args[0]).toStrictEqual({ ...base, healthUrl: 'http://localhost:3001' });
+  });
+
+  it('drops a service key from extra, because the logger binds service on every line', () => {
+    const { calls, logger } = recordingLogger();
+
+    logStarted(logger, { ...base, extra: { service: 'users', healthUrl: 'http://localhost:3001' } });
+
+    expect(calls[0]?.args[0]).not.toHaveProperty('service');
     expect(calls[0]?.args[0]).toStrictEqual({ ...base, healthUrl: 'http://localhost:3001' });
   });
 

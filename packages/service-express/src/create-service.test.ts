@@ -492,8 +492,9 @@ describe('createService — port and startup banner', () => {
 
     const calls = startedCalls(spies.current!);
     expect(calls).toHaveLength(1);
+    // No `service` here: the logger binds it on every line, so the record repeating it would
+    // write the key twice into the JSON line.
     expect(calls[0]![0]).toStrictEqual({
-      service: 'test-svc',
       version: readServiceVersion(),
       transport: 'http',
       url: handle.url,

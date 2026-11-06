@@ -156,7 +156,6 @@ describe('terminal', () => {
     const lines: string[] = [];
 
     logStarted(capturingPino(lines), {
-      service: 'orders',
       version: '1.2.3',
       transport: 'http',
       url: 'http://localhost:3001',
@@ -195,7 +194,6 @@ describe('terminal', () => {
     const lines: string[] = [];
 
     logStarted(capturingPino(lines), {
-      service: 'orders',
       version: '1.2.3',
       transport: 'stdio',
       features: {},

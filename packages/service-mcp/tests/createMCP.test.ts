@@ -351,7 +351,6 @@ describe('createMCP', () => {
     await handle.ready();
 
     expect(startedRecords()).toEqual([{
-      service: 'test-mcp',
       version: '1.4.0',
       transport: 'stdio',
       features: { search: true },
@@ -410,7 +409,6 @@ describe('createMCP', () => {
     await handle.ready();
 
     expect(startedRecords()).toEqual([{
-      service: 'test-mcp',
       version: '2.1.0',
       transport: 'http',
       url: 'http://localhost:8080',

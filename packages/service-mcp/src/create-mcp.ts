@@ -52,7 +52,6 @@ function logHttpStarted(
   health: HealthServerHandle,
 ): void {
   logStarted(logger, {
-    service: config.serviceId,
     version: config.version,
     transport: 'http',
     url: localUrl(http.port),
@@ -225,7 +224,6 @@ export function createMCP(config: MCPConfig): MCPHandle {
       transportInstance = await wireStdioTransport(server);
       address = { transport: 'stdio' };
       logStarted(logger, {
-        service: resolved.serviceId,
         version: resolved.version,
         transport: 'stdio',
         features: resolved.features,

@@ -26,10 +26,11 @@ warning.
 
 Once both servers listen in HTTP mode, `createMCP` calls the core's
 `logStarted` once, which writes one `info` record with message `started`:
-`service`, `version`, `transport` (`http`), `url`, `features` and
-`healthUrl`, with `fallbackPort` and `healthFallbackPort`, the asked ports,
-present only for a server that fell back. `version` (default `unknown`) is
-also the version `McpServer` reports to clients.
+`version`, `transport` (`http`), `url`, `features` and `healthUrl`, with
+`fallbackPort` and `healthFallbackPort`, the asked ports, present only for
+a server that fell back. The line's `service` is the logger's own binding,
+written once. `version` (default `unknown`) is also the version `McpServer`
+reports to clients.
 
 In `stdio` mode, once the transport is connected, `logStarted` writes the
 same record with `transport` `stdio`, no `url` and no health fields, since
