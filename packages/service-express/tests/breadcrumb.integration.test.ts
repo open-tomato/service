@@ -47,7 +47,8 @@ describe('Express breadcrumbs (integration)', () => {
   it('logs the x-request-id header as traceId with the scope and answers with it', async () => {
     const { logger, records } = captureLogger();
 
-    const res = await request(buildApp(logger)).post('/users').set(REQUEST_ID_HEADER, 'trace-abc');
+    const res = await request(buildApp(logger)).post('/users')
+      .set(REQUEST_ID_HEADER, 'trace-abc');
 
     expect(res.status).toBe(201);
     expect(res.headers[REQUEST_ID_HEADER]).toBe('trace-abc');
@@ -76,15 +77,18 @@ describe('Express breadcrumbs (integration)', () => {
     const app = buildApp(logger, gate);
 
     const pending = Promise.all([
-      request(app).post('/users').set(REQUEST_ID_HEADER, 'trace-one'),
-      request(app).post('/users').set(REQUEST_ID_HEADER, 'trace-two'),
+      request(app).post('/users')
+        .set(REQUEST_ID_HEADER, 'trace-one'),
+      request(app).post('/users')
+        .set(REQUEST_ID_HEADER, 'trace-two'),
     ]);
     setTimeout(release, 50);
     const [one, two] = await pending;
 
     expect(one.headers[REQUEST_ID_HEADER]).toBe('trace-one');
     expect(two.headers[REQUEST_ID_HEADER]).toBe('trace-two');
-    const ids = createRecords(records()).map((r) => r['traceId']).sort();
+    const ids = createRecords(records()).map((r) => r['traceId'])
+      .sort();
     expect(ids).toEqual(['trace-one', 'trace-two']);
   });
 });
