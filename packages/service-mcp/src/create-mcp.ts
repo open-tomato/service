@@ -126,7 +126,11 @@ export function createMCP(config: MCPConfig): MCPHandle {
     const transport = resolveTransport();
 
     if (transport === 'http') {
-      transportInstance = await wireHttpTransport(server, ports.port);
+      transportInstance = await wireHttpTransport(server, {
+        port: ports.port,
+        strict: ports.strict,
+        logger,
+      });
       healthServer = await startHealthServer({
         port: ports.health.port,
         strict: ports.health.strict,
