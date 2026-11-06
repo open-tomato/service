@@ -165,19 +165,19 @@ a new UUID. The response answers with the same `x-request-id`, and `req.log`
 binds the id as `traceId`, so every record a route writes through `req.log`
 carries it. A terminal line shows the first 8 characters of it.
 
-A logger from `scoped(logger, module, action)`, imported from
-`@open-tomato/service` (this package does not re-export it), adds a `scope`
-such as `Orders:create` to each record it writes, so a line names the code
-that wrote it:
+A logger from `scoped(inDomain(logger, 'Orders'), 'create')`, with both
+imported from `@open-tomato/service` (this package does not re-export them),
+adds `domain: 'Orders'` and `scope: 'create'` to each record it writes, so a
+line names the code that wrote it:
 
 ```ts
-import { scoped } from '@open-tomato/service';
+import { inDomain, scoped } from '@open-tomato/service';
 import { createService } from '@open-tomato/service-express';
 
 await createService({
   serviceId: 'orders',
   register(app, { logger }) {
-    const log = scoped(logger, 'Orders', 'create');
+    const log = scoped(inDomain(logger, 'Orders'), 'create');
     app.post('/orders', (req, res) => {
       req.log.info('order request received');
       log.info({ orderId: 'o-1' }, 'order created');

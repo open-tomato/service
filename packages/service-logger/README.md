@@ -84,8 +84,9 @@ one request read as a path through the code:
   order into one signature slot: `Users:create:insert` for all three,
   `Users:create` for a domain and a scope, `Users` for the domain alone.
 
-Bind them with `child`. The core's `scoped(logger, 'Users', 'create')`, from
-`@open-tomato/service`, sets the scope for you. A record with neither slot
+Bind them with `child`. The core's `inDomain(logger, 'Users')` and
+`scoped(logger, 'create')`, from `@open-tomato/service`, set the domain and
+the scope for you. A record with neither slot
 draws no placeholder.
 
 ```ts
@@ -94,7 +95,8 @@ import { createLogger } from '@open-tomato/service-logger';
 const logger = createLogger('orders');
 const scopedLogger = logger.child({
   traceId: '3f2a9c1e5d6b4a',
-  scope: 'Users:create',
+  domain: 'Users',
+  scope: 'create',
 });
 scopedLogger.info({ userId: 42 }, 'user created');
 ```

@@ -1,4 +1,4 @@
-import { inDomain, logStarted } from '@open-tomato/service';
+import { inDomain, logStarted, scoped } from '@open-tomato/service';
 import pino from 'pino';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -73,10 +73,10 @@ describe('terminal', () => {
     const lines: string[] = [];
     const logger = capturingPino(lines);
 
-    inDomain(logger.child({ traceId: 'abcdef0123456789' }), 'Users').child({ scope: 'create' })
-      .warn('slow');
+    scoped(inDomain(logger.child({ traceId: 'abcdef0123456789' }), 'Users'), 'create').warn('slow');
 
     expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0] ?? '{}')).toMatchObject({ domain: 'Users', scope: 'create' });
     expect(terminal(lines[0] ?? '')).toMatch(/^\d\d:\d\d:\d\d\.\d{3} WARN {2}orders {2}abcdef01 {2}Users:create {2}slow\n$/);
   });
 

@@ -13,7 +13,7 @@ package spells the field as a string literal:
 |---|---|---|---|
 | `traceId` | `TRACE_ID_FIELD` | the adapter, per request | yes |
 | `domain` | `DOMAIN_FIELD` | `inDomain(logger, 'Users')`, when a domain's logger is made | yes |
-| `scope` | `SCOPE_FIELD` | `scoped(...)`, at an entry point of a file's workflow | yes |
+| `scope` | `SCOPE_FIELD` | `scoped(logger, 'create')`, at an entry point of a file's workflow | yes |
 | `step` | `STEP_FIELD` | each call's context object | never |
 
 `traceId`, `domain` and `scope` are bound with `child`, so every record the
@@ -33,22 +33,25 @@ log.info({ step: 'insert', userId: 'u-1' }, 'user created');
 `inDomain` and `scoped` both return a child, and a child's bindings win
 over its parent's: calling `inDomain` on a domain logger replaces the domain
 and keeps the trace id and the scope, and scoping a scoped logger replaces
-the scope. Neither touches the logger it was given.
+the scope and keeps the trace id and the domain. Neither touches the logger it was given.
 
 ## Case convention
 
 The domain is in PascalCase (`Users`); the scope and the step are in
-camelCase (`create`, `insert`). `scoped(logger, module, action)` still
-takes a module and writes `scope: '<Module>:<action>'`, so its action is
-the camelCase part.
+camelCase (`create`, `insert`). `scoped(logger, scope)` writes the scope
+as given; the domain comes from `inDomain`, so a domain's entry point reads
+`scoped(inDomain(logger, 'Users'), 'create')`.
 
 ## How it is tested
 
 `src/logger.test.ts` writes through `createConsoleLogger` into a recording
 sink and checks each record's fields: that `inDomain` and `scoped` leave
 the logger they were given unchanged, that a record carries the `domain`
-or `scope` bound on it, that a second `inDomain` replaces only the domain,
-and that the constants name the fields `traceId`, `domain`, `scope` and
+or `scope` bound on it, that `inDomain` then `scoped` give `domain` and
+`scope` as two fields, that a second `scoped` replaces the scope and keeps
+the domain, that a second `inDomain` replaces only the domain, that a call's
+`step` reaches only its own record and the next record carries none, and
+that the constants name the fields `traceId`, `domain`, `scope` and
 `step`. `src/index.test.ts` pins their exports.
 
 ## Usage

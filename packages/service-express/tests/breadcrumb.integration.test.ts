@@ -3,7 +3,7 @@ import type { Logger } from '@open-tomato/service';
 
 import { Writable } from 'node:stream';
 
-import { scoped } from '@open-tomato/service';
+import { inDomain, scoped } from '@open-tomato/service';
 import express from 'express';
 import pino from 'pino';
 import request from 'supertest';
@@ -27,13 +27,13 @@ function captureLogger(): { logger: Logger, records: () => Record<string, unknow
   return { logger, records: () => lines.map((line) => JSON.parse(line) as Record<string, unknown>) };
 }
 
-/** An app whose route waits for a release gate, then logs through `scoped(req.log, ...)`. */
+/** An app whose route waits for a release gate, then logs through `scoped(inDomain(req.log, 'Users'), 'create')`. */
 function buildApp(logger: Logger, gate?: Promise<void>): express.Application {
   const app = express();
   applyMiddleware(app, { serviceId: SERVICE_ID } as ResolvedServiceConfig, logger);
   app.post('/users', async (req, res) => {
     if (gate) await gate;
-    scoped(req.log as unknown as Logger, 'Users', 'create').info({ marker: 'create' }, 'user created');
+    scoped(inDomain(req.log as unknown as Logger, 'Users'), 'create').info({ marker: 'create' }, 'user created');
     res.status(201).json({ ok: true });
   });
   return app;
@@ -44,7 +44,7 @@ function createRecords(records: Record<string, unknown>[]): Record<string, unkno
 }
 
 describe('Express breadcrumbs (integration)', () => {
-  it('logs the x-request-id header as traceId with the scope and answers with it', async () => {
+  it('logs the x-request-id header as traceId with the domain and scope and answers with it', async () => {
     const { logger, records } = captureLogger();
 
     const res = await request(buildApp(logger)).post('/users')
@@ -54,7 +54,7 @@ describe('Express breadcrumbs (integration)', () => {
     expect(res.headers[REQUEST_ID_HEADER]).toBe('trace-abc');
     const [record, ...rest] = createRecords(records());
     expect(rest).toHaveLength(0);
-    expect(record).toMatchObject({ traceId: 'trace-abc', scope: 'Users:create', msg: 'user created' });
+    expect(record).toMatchObject({ traceId: 'trace-abc', domain: 'Users', scope: 'create', msg: 'user created' });
   });
 
   it('generates a new UUID traceId when the request carries no id', async () => {
@@ -65,7 +65,7 @@ describe('Express breadcrumbs (integration)', () => {
     const id = res.headers[REQUEST_ID_HEADER];
     expect(id).toMatch(UUID);
     const [record] = createRecords(records());
-    expect(record).toMatchObject({ traceId: id, scope: 'Users:create' });
+    expect(record).toMatchObject({ traceId: id, domain: 'Users', scope: 'create' });
   });
 
   it('keeps each concurrent request on its own traceId', async () => {

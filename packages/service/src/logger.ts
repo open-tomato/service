@@ -129,7 +129,7 @@ export function createConsoleLogger(name: string, options: ConsoleLoggerOptions 
 /** The record field that carries the request's trace id. */
 export const TRACE_ID_FIELD = 'traceId';
 
-/** The record field that names the code that wrote it, as `<Module>:<action>`. */
+/** The record field that names the entry point of a file's workflow, such as `create`. */
 export const SCOPE_FIELD = 'scope';
 
 /** The record field that names the domain the record belongs to, such as `Users`. */
@@ -144,7 +144,7 @@ export interface LogBreadcrumb {
   [TRACE_ID_FIELD]?: string
   /** The domain the record belongs to, in PascalCase, such as `Users`. */
   [DOMAIN_FIELD]?: string
-  /** Where the record was written, as `<Module>:<action>`. */
+  /** The entry point of a file's workflow, in camelCase, such as `create`. */
   [SCOPE_FIELD]?: string
   /** The step within the scope, in camelCase, such as `insert`; passed in the call's fields. */
   [STEP_FIELD]?: string
@@ -171,22 +171,22 @@ export function inDomain(logger: Logger, domain: string): Logger {
 }
 
 /**
- * Returns a child logger whose records carry `scope: '<module>:<action>'`.
+ * Returns a child logger whose records carry `scope`.
  *
- * A child's bindings win over its parent's, so scoping a scoped logger
- * replaces the scope rather than adding a second one.
+ * The scope names the entry point of a file's workflow; the domain comes from
+ * {@link inDomain}. A child's bindings win over its parent's, so scoping a
+ * scoped logger replaces the scope and keeps the domain and the trace id.
  *
  * @param logger - The logger to scope.
- * @param module - The module name, such as `Users`.
- * @param action - The action within it, such as `create`.
+ * @param scope - The entry point, in camelCase, such as `create`.
  * @returns The child {@link Logger}.
  *
  * @example
  * ```ts
- * const log = scoped(createConsoleLogger('users'), 'Users', 'create');
- * log.info('user created'); // carries scope: 'Users:create'
+ * const log = scoped(inDomain(createConsoleLogger('users'), 'Users'), 'create');
+ * log.info({ step: 'insert' }, 'user created'); // carries domain: 'Users', scope: 'create', step: 'insert'
  * ```
  */
-export function scoped(logger: Logger, module: string, action: string): Logger {
-  return logger.child({ [SCOPE_FIELD]: `${module}:${action}` });
+export function scoped(logger: Logger, scope: string): Logger {
+  return logger.child({ [SCOPE_FIELD]: scope });
 }

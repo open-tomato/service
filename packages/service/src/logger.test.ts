@@ -131,38 +131,64 @@ describe('scoped', () => {
     const { sink, calls } = recordingSink();
     const logger = createConsoleLogger('users', { sink });
 
-    scoped(logger, 'Users', 'create');
+    scoped(logger, 'create');
     logger.info('plain');
 
     expect(calls.info).toEqual([['plain', { level: 'info', service: 'users' }]]);
   });
 
-  it('writes records that carry scope as <Module>:<action>', () => {
+  it('writes records that carry the scope as given', () => {
     const { sink, calls } = recordingSink();
 
-    scoped(createConsoleLogger('users', { sink }), 'Users', 'create').info('user created');
+    scoped(createConsoleLogger('users', { sink }), 'create').info('user created');
 
-    expect(calls.info).toEqual([['user created', { level: 'info', service: 'users', scope: 'Users:create' }]]);
+    expect(calls.info).toEqual([['user created', { level: 'info', service: 'users', scope: 'create' }]]);
   });
 
-  it('replaces the scope when a scoped logger is scoped again', () => {
+  it('gives domain and scope as two fields after inDomain', () => {
     const { sink, calls } = recordingSink();
-    const outer = scoped(createConsoleLogger('users', { sink }), 'Users', 'create');
 
-    scoped(outer, 'Mailer', 'send').info('mail sent');
+    scoped(inDomain(createConsoleLogger('users', { sink }), 'Users'), 'create').info('user created');
 
-    expect(calls.info).toEqual([['mail sent', { level: 'info', service: 'users', scope: 'Mailer:send' }]]);
+    const fields = calls.info[0]?.[1];
+    expect(fields).toHaveProperty(DOMAIN_FIELD, 'Users');
+    expect(fields).toHaveProperty(SCOPE_FIELD, 'create');
   });
 
-  it('gives a child the traceId and scope and no fields of earlier calls', () => {
+  it('replaces the scope and keeps the domain when a scoped logger is scoped again', () => {
+    const { sink, calls } = recordingSink();
+    const outer = scoped(inDomain(createConsoleLogger('users', { sink }), 'Users'), 'create');
+
+    scoped(outer, 'notify').info('mail sent');
+
+    expect(calls.info).toEqual([
+      ['mail sent', { level: 'info', service: 'users', domain: 'Users', scope: 'notify' }],
+    ]);
+  });
+
+  it('writes a call\'s step on that record only, and none on the next', () => {
+    const { sink, calls } = recordingSink();
+    const log = scoped(inDomain(createConsoleLogger('users', { sink }), 'Users'), 'create');
+
+    log.info({ [STEP_FIELD]: 'insert' }, 'user created');
+    log.info('done');
+
+    expect(calls.info[0]?.[1]).toHaveProperty(STEP_FIELD, 'insert');
+    expect(calls.info[1]?.[1]).toEqual({ level: 'info', service: 'users', domain: 'Users', scope: 'create' });
+    expect(calls.info[1]?.[1]).not.toHaveProperty(STEP_FIELD);
+  });
+
+  it('gives a child the traceId, domain and scope and no fields of earlier calls', () => {
     const { sink, calls } = recordingSink();
     const logger = createConsoleLogger('users', { sink });
     logger.info({ userId: 'u-1' }, 'earlier');
 
-    const child = scoped(logger.child({ [TRACE_ID_FIELD]: 't-1' }), 'Users', 'create');
+    const child = scoped(inDomain(logger.child({ [TRACE_ID_FIELD]: 't-1' }), 'Users'), 'create');
     child.info('later');
 
-    expect(calls.info[1]).toEqual(['later', { level: 'info', service: 'users', traceId: 't-1', scope: 'Users:create' }]);
+    expect(calls.info[1]).toEqual([
+      'later', { level: 'info', service: 'users', traceId: 't-1', domain: 'Users', scope: 'create' },
+    ]);
     expect(calls.info[1]?.[1]).not.toHaveProperty('userId');
   });
 
@@ -196,12 +222,12 @@ describe('inDomain', () => {
   it('replaces only the domain when called on a domain logger', () => {
     const { sink, calls } = recordingSink();
     const traced = createConsoleLogger('users', { sink }).child({ [TRACE_ID_FIELD]: 't-1' });
-    const outer = scoped(inDomain(traced, 'Users'), 'Users', 'create');
+    const outer = scoped(inDomain(traced, 'Users'), 'create');
 
     inDomain(outer, 'Mailer').info('mail sent');
 
     expect(calls.info).toEqual([
-      ['mail sent', { level: 'info', service: 'users', traceId: 't-1', domain: 'Mailer', scope: 'Users:create' }],
+      ['mail sent', { level: 'info', service: 'users', traceId: 't-1', domain: 'Mailer', scope: 'create' }],
     ]);
   });
 
