@@ -12,6 +12,12 @@
 export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' | 'silent';
 
 /**
+ * How the node entry writes a record: `'terminal'` draws a line for a person,
+ * `'json'` writes pino's JSON record unchanged.
+ */
+export type LogFormat = 'terminal' | 'json';
+
+/**
  * Arbitrary structured key-value pairs that can be attached to log entries
  * as contextual metadata (e.g. `requestId`, `userId`, `tenantId`).
  */
@@ -71,8 +77,17 @@ export interface LoggerOptions {
    */
   context?: LogContext
   /**
-   * Enable human-readable `pino-pretty` output. Defaults to `true` when
-   * `NODE_ENV === 'development'`. Has no effect in the browser entry.
+   * How records are written: `'terminal'` draws a line for a person, `'json'`
+   * writes pino's JSON record. When omitted, `LOG_FORMAT` decides, then
+   * `pretty`, then whether stdout is a TTY. Has no effect in the browser entry.
+   */
+  format?: LogFormat
+  /**
+   * `true` is `format: 'terminal'` and `false` is `format: 'json'`; read only
+   * when neither `format` nor `LOG_FORMAT` is set. Has no effect in the
+   * browser entry.
+   *
+   * @deprecated Use `format`.
    */
   pretty?: boolean
 }

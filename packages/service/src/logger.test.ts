@@ -2,7 +2,7 @@ import type { LogSink } from './logger.js';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createConsoleLogger } from './logger.js';
+import { createConsoleLogger, SCOPE_FIELD, scoped, TRACE_ID_FIELD } from './logger.js';
 
 /** A sink that records every call, one array per console method. */
 function recordingSink() {
@@ -123,5 +123,51 @@ describe('createConsoleLogger', () => {
     createConsoleLogger('orders', { level: 'info' }).info('to the console');
 
     expect(info).toHaveBeenCalledWith('to the console', { level: 'info', service: 'orders' });
+  });
+});
+
+describe('scoped', () => {
+  it('does not add a scope to the logger it was given', () => {
+    const { sink, calls } = recordingSink();
+    const logger = createConsoleLogger('users', { sink });
+
+    scoped(logger, 'Users', 'create');
+    logger.info('plain');
+
+    expect(calls.info).toEqual([['plain', { level: 'info', service: 'users' }]]);
+  });
+
+  it('writes records that carry scope as <Module>:<action>', () => {
+    const { sink, calls } = recordingSink();
+
+    scoped(createConsoleLogger('users', { sink }), 'Users', 'create').info('user created');
+
+    expect(calls.info).toEqual([['user created', { level: 'info', service: 'users', scope: 'Users:create' }]]);
+  });
+
+  it('replaces the scope when a scoped logger is scoped again', () => {
+    const { sink, calls } = recordingSink();
+    const outer = scoped(createConsoleLogger('users', { sink }), 'Users', 'create');
+
+    scoped(outer, 'Mailer', 'send').info('mail sent');
+
+    expect(calls.info).toEqual([['mail sent', { level: 'info', service: 'users', scope: 'Mailer:send' }]]);
+  });
+
+  it('gives a child the traceId and scope and no fields of earlier calls', () => {
+    const { sink, calls } = recordingSink();
+    const logger = createConsoleLogger('users', { sink });
+    logger.info({ userId: 'u-1' }, 'earlier');
+
+    const child = scoped(logger.child({ [TRACE_ID_FIELD]: 't-1' }), 'Users', 'create');
+    child.info('later');
+
+    expect(calls.info[1]).toEqual(['later', { level: 'info', service: 'users', traceId: 't-1', scope: 'Users:create' }]);
+    expect(calls.info[1]?.[1]).not.toHaveProperty('userId');
+  });
+
+  it('names the breadcrumb fields traceId and scope', () => {
+    expect(TRACE_ID_FIELD).toBe('traceId');
+    expect(SCOPE_FIELD).toBe('scope');
   });
 });

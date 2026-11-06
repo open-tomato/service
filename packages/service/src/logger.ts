@@ -125,3 +125,38 @@ export function createConsoleLogger(name: string, options: ConsoleLoggerOptions 
     }),
   } as unknown as Logger;
 }
+
+/** The record field that carries the request's trace id. */
+export const TRACE_ID_FIELD = 'traceId';
+
+/** The record field that names the code that wrote it, as `<Module>:<action>`. */
+export const SCOPE_FIELD = 'scope';
+
+/** The breadcrumb fields a record may carry: its trace id and its scope. */
+export interface LogBreadcrumb {
+  /** The trace id of the request the record belongs to. */
+  [TRACE_ID_FIELD]?: string
+  /** Where the record was written, as `<Module>:<action>`. */
+  [SCOPE_FIELD]?: string
+}
+
+/**
+ * Returns a child logger whose records carry `scope: '<module>:<action>'`.
+ *
+ * A child's bindings win over its parent's, so scoping a scoped logger
+ * replaces the scope rather than adding a second one.
+ *
+ * @param logger - The logger to scope.
+ * @param module - The module name, such as `Users`.
+ * @param action - The action within it, such as `create`.
+ * @returns The child {@link Logger}.
+ *
+ * @example
+ * ```ts
+ * const log = scoped(createConsoleLogger('users'), 'Users', 'create');
+ * log.info('user created'); // carries scope: 'Users:create'
+ * ```
+ */
+export function scoped(logger: Logger, module: string, action: string): Logger {
+  return logger.child({ [SCOPE_FIELD]: `${module}:${action}` });
+}

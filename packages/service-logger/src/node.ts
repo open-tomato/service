@@ -5,7 +5,8 @@
  * Do not import this module from browser bundles — use the `browser` entry
  * instead (resolved automatically via the `browser` export condition).
  */
-import type { Logger, LoggerOptions, LogLevel, HttpLoggerOptions } from './types.js';
+import type { Decorator } from './decorators.js';
+import type { Logger, LoggerOptions, LogFormat, LogLevel, HttpLoggerOptions } from './types.js';
 
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
@@ -13,30 +14,81 @@ import process from 'node:process';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 
+import { terminal } from './decorators.js';
+
+/** The values `LOG_FORMAT` may hold; any other value is ignored. */
+const LOG_FORMATS: ReadonlySet<string> = new Set<LogFormat>(['terminal', 'json']);
+
+function isLogFormat(value: string | undefined): value is LogFormat {
+  return value !== undefined && LOG_FORMATS.has(value);
+}
+
+/**
+ * Pick the format: the `format` option, then `LOG_FORMAT`, then the legacy
+ * `pretty` option, then whether stdout is a TTY.
+ */
+function pickFormat(options: LoggerOptions | undefined): LogFormat {
+  if (options?.format !== undefined) return options.format;
+  const fromEnv = process.env['LOG_FORMAT'];
+  if (isLogFormat(fromEnv)) return fromEnv;
+  if (options?.pretty !== undefined) {
+    return options.pretty
+      ? 'terminal'
+      : 'json';
+  }
+  return process.stdout.isTTY === true
+    ? 'terminal'
+    : 'json';
+}
+
+/**
+ * A synchronous stream that writes each pino line to stdout through
+ * `decorate`. stdout is read on every write, so a later swap of
+ * `process.stdout.write` is honoured.
+ */
+function decoratedStdout(decorate: Decorator): pino.DestinationStream {
+  return {
+    write: (line: string) => {
+      process.stdout.write(decorate(line));
+    },
+  };
+}
+
+/**
+ * The stream for a format: the terminal decorator over stdout, or
+ * `undefined` for `json` so pino writes its own record to stdout.
+ */
+function channelFor(format: LogFormat): pino.DestinationStream | undefined {
+  return format === 'terminal'
+    ? decoratedStdout(terminal)
+    : undefined;
+}
+
 /**
  * Create a named pino logger bound to the given service name.
  *
  * @param name - Service identifier attached to every log entry as `service`.
- * @param options - Optional configuration overrides (level, context, pretty).
+ * @param options - Optional configuration overrides (level, context, format).
  * @returns A {@link Logger} instance configured for Node.js output.
  *
  * @example
  * ```ts
- * const logger = createLogger('my-service', { level: 'debug' });
+ * const logger = createLogger('my-service', { level: 'debug', format: 'json' });
  * logger.info({ requestId: '123' }, 'handling request');
  * ```
  */
 export function createLogger(name: string, options?: LoggerOptions): Logger {
   const level: LogLevel = options?.level ?? (process.env['LOG_LEVEL'] as LogLevel) ?? 'info';
-  const pretty = options?.pretty ?? process.env['NODE_ENV'] === 'development';
-
-  return pino({
+  const pinoOptions: pino.LoggerOptions = {
     level,
-    transport: pretty
-      ? { target: 'pino-pretty' }
-      : undefined,
     base: { service: name, ...options?.context },
-  }) as unknown as Logger;
+    serializers: { err: pino.stdSerializers.errWithCause },
+  };
+  const channel = channelFor(pickFormat(options));
+
+  return (channel === undefined
+    ? pino(pinoOptions)
+    : pino(pinoOptions, channel)) as unknown as Logger;
 }
 
 /** Header paths redacted from HTTP log entries by default. */
@@ -91,4 +143,4 @@ export function createHttpLogger(options?: HttpLoggerOptions) {
   });
 }
 
-export type { Logger, LogLevel, LogContext, LoggerOptions, HttpLoggerOptions } from './types.js';
+export type { Logger, LogLevel, LogContext, LogFormat, LoggerOptions, HttpLoggerOptions } from './types.js';

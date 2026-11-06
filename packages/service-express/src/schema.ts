@@ -21,8 +21,23 @@ export const ServiceConfigSchema = z.object({
    */
   register: z.custom<(app: Application, ctx: ServiceContext) => void | Promise<void>>(),
 
-  /** TCP port the HTTP server listens on. @default 3000 */
-  port: z.number().default(3000),
+  /**
+   * TCP port the HTTP server listens on. When omitted, the `PORT`
+   * environment variable is read, then 3000; see `resolvePortConfig`.
+   */
+  port: z.number().optional(),
+  /**
+   * When `true`, a taken port rejects with `PortInUseError` instead of
+   * falling back to a later port. When omitted, the `PORT_STRICT`
+   * environment variable is read, then `false`; see `resolvePortConfig`.
+   */
+  strictPort: z.boolean().optional(),
+  /**
+   * Feature flags or settings reported in the startup banner, as a record
+   * of string, number or boolean values.
+   * @default {}
+   */
+  features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default(() => ({})),
   /**
    * Session introspection configuration.
    * When provided, `requireAuth` and `optionalAuth` validate sessions against

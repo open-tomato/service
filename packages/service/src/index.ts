@@ -51,9 +51,15 @@ export type { ApiError } from './error-client.js';
 export { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
 export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from './schema.js';
 
+export { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
+export type { PickedPort, PickPortOptions, PortRange } from './ports.js';
+
+export { logStarted, STARTED_MESSAGE } from './banner.js';
+export type { BannerFeatureValue, StartupBanner } from './banner.js';
+
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 
-export { createConsoleLogger } from './logger.js';
-export type { ConsoleLoggerOptions, Logger, LogLevel, LogSink } from './logger.js';
+export { createConsoleLogger, SCOPE_FIELD, scoped, TRACE_ID_FIELD } from './logger.js';
+export type { ConsoleLoggerOptions, LogBreadcrumb, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';
