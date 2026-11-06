@@ -160,10 +160,22 @@ itself, since pino's JSON is not readable by a person. `NODE_ENV` plays no
 part, so a service run by hand in a terminal prints readable lines whatever
 its environment.
 
-Each request gets an id: its `x-request-id` header when it carries one, else
-a new UUID. The response answers with the same `x-request-id`, and `req.log`
-binds the id as `traceId`, so every record a route writes through `req.log`
-carries it. A terminal line shows the first 8 characters of it.
+Each request gets an id: its `x-request-id` header when it matches
+`[A-Za-z0-9._:-]{1,64}`, else a new UUID. A header outside that rule, such as
+one with a space or one longer than 64 characters, is replaced by a new UUID,
+and the response's `x-request-id` echoes the id chosen, so a caller can tell
+which id its lines carry. `req.log` binds only that id, as `traceId`, so a
+crumb a route writes through it is one short line with no request in it. The
+`request completed` line carries `req`, `res` and `responseTime` once, under
+the same `traceId`. The `terminal` format draws it as a tail such as
+`POST /orders → 201 3ms`; `json` keeps the fields, so a pipeline joins that
+line to its crumbs by `traceId`. A terminal line shows the first 8 characters
+of the id.
+
+```text
+12:04:31.250 INFO  orders  3f2a9c1e  order request received
+12:04:31.250 INFO  orders  3f2a9c1e  request completed  POST /orders → 201 3ms
+```
 
 A logger from `scoped(inDomain(logger, 'Orders'), 'create')`, with both
 imported from `@open-tomato/service` (this package does not re-export them),

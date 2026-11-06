@@ -31,10 +31,21 @@ Every record carries `service: 'orders'` and the `context` fields, so a log
 aggregator can filter by service. The level comes from `options.level`,
 then `LOG_LEVEL`, then `info`.
 
+Records go to stdout by default. Pass `destination: 'stderr'` to send every
+line to stderr instead, for a process whose stdout is a protocol channel:
+
+```ts
+import { createLogger } from '@open-tomato/service-logger';
+
+const logger = createLogger('svc', { destination: 'stderr' });
+
+logger.info('server listening on stdio');
+```
+
 The browser build has the same `createLogger(name, options)` and the same
 `Logger` interface; bundlers pick it through the package's `browser` export
-condition. It has no terminal format, so `format`, `pretty`, `LOG_FORMAT` and
-`NO_COLOR` do nothing there.
+condition. It has no terminal format and no stream, so `format`, `pretty`,
+`LOG_FORMAT`, `NO_COLOR` and `destination` do nothing there.
 
 ## Terminal or JSON
 
@@ -44,15 +55,16 @@ A record is written in one of two formats:
 
   ```text
   12:04:31.250 INFO  orders  3f2a9c1e  Users:create:insert  user created  userId=42
+  12:04:31.250 INFO  orders  3f2a9c1e  request completed  POST /users → 201 3ms
   ```
 
 - `json` writes pino's record unchanged, one JSON object per line, for a log
   shipper, `jq` or any other program that reads the records.
 
-Standard output is for people, so a terminal gets `terminal`. A pipe or a file
-gets `json`, because whatever reads one is a program that wants the raw
-records; pino's JSON is not meant for a person to read, so the line is drawn
-on the way out and the record stays whole.
+The stream the records go to is for people when it is a terminal, so a terminal
+gets `terminal`. A pipe or a file gets `json`, because whatever reads one is a
+program that wants the raw records; pino's JSON is not meant for a person to
+read, so the line is drawn on the way out and the record stays whole.
 
 The format is picked once, when the logger is built. The first rung that
 answers wins:
@@ -61,7 +73,9 @@ answers wins:
 2. `LOG_FORMAT`, when set to exactly `terminal` or `json`; any other value is
    ignored;
 3. the deprecated `pretty` option: `true` is `terminal`, `false` is `json`;
-4. whether stdout is a TTY: a terminal gets `terminal`, anything else `json`.
+4. whether the chosen `destination` stream is a TTY: stderr with
+   `destination: 'stderr'`, stdout otherwise. A terminal gets `terminal`,
+   anything else `json`.
 
 `NODE_ENV` plays no part. A service run by hand in a terminal prints readable
 lines whatever its `NODE_ENV`, and a piped one prints JSON.
@@ -130,9 +144,19 @@ than the entry point.
 
 `createHttpLogger` returns [pino-http](https://www.npmjs.com/package/pino-http)
 middleware for Express or `node:http`. It redacts the `authorization`,
-`cookie` and `x-api-key` headers, gives each request an id (the
-`x-request-id` header when present), and skips routes under `/_health` and
-`/_control`.
+`cookie` and `x-api-key` headers, gives each request an id, and skips routes
+under `/_health` and `/_control`.
+
+The id is the `x-request-id` header when it matches `[A-Za-z0-9._:-]` at one
+to 64 characters, else a new UUID; the response's `x-request-id` echoes the
+id its lines carry. The id is written as `traceId`, on every line of the
+request, in place of `requestId`.
+
+`req.log` is quiet: it binds only `traceId`, so a crumb logged through it is
+one short line, and the request's `req`, `res` and `responseTime` come once,
+on the completion line, which the `terminal` format draws as
+`POST /users → 201 3ms`. In `json` the completion line joins its crumbs by
+`traceId`.
 
 ```ts
 import { createServer } from 'node:http';
@@ -159,7 +183,8 @@ With Express, pass it to `app.use(httpLogger)`.
 |---|---|---|
 | `level` | `LOG_LEVEL`, then `info` | `trace`, `debug`, `info`, `warn`, `error`, `fatal` or `silent` |
 | `context` | none | fields added to every record |
-| `format` | `LOG_FORMAT`, then `pretty`, then `terminal` on a TTY and `json` otherwise | `terminal` for readable lines, `json` for pino's records; see [Terminal or JSON](#terminal-or-json) |
+| `format` | `LOG_FORMAT`, then `pretty`, then `terminal` on a TTY destination and `json` otherwise | `terminal` for readable lines, `json` for pino's records; see [Terminal or JSON](#terminal-or-json) |
+| `destination` | `stdout` | `stdout` or `stderr`, the stream every line is written to; the format pick reads this stream's TTY |
 | `pretty` | none | deprecated: `true` is `format: 'terminal'`, `false` is `format: 'json'`, read only when neither `format` nor `LOG_FORMAT` is set |
 
 | `createHttpLogger` option | Default | Meaning |

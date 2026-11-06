@@ -1,3 +1,4 @@
+import type { Logger } from '../node.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { EventEmitter } from 'node:events';
@@ -180,54 +181,110 @@ describe('createHttpLogger — health route ignore', () => {
   });
 });
 
-describe('createHttpLogger — requestId from crypto.randomUUID()', () => {
-  it('generates requestId via crypto.randomUUID() when x-request-id header is absent', () => {
-    const middleware = createHttpLogger();
+/** A version-4 UUID, the shape `randomUUID()` returns. */
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    const req = Object.assign(Object.create(null), {
-      headers: {},
-      method: 'GET',
-      url: '/api/test',
-      socket: { remoteAddress: '127.0.0.1' },
-    }) as unknown as IncomingMessage;
+/** A request with the given headers, for the middleware under test. */
+function fakeRequest(headers: Record<string, string>, url = '/api/test'): IncomingMessage {
+  return Object.assign(Object.create(null), {
+    headers,
+    method: 'GET',
+    url,
+    socket: { remoteAddress: '127.0.0.1' },
+  }) as unknown as IncomingMessage;
+}
 
-    const res = Object.assign(Object.create(null), {
-      statusCode: 200,
-      setHeader: vi.fn(),
-      getHeader: vi.fn(),
-      on: vi.fn(),
-    }) as unknown as ServerResponse;
+/** A response that can emit `finish`, for the completion line. */
+function fakeResponse(): ServerResponse {
+  return Object.assign(new EventEmitter(), {
+    statusCode: 200,
+    setHeader: vi.fn(),
+    getHeader: vi.fn(),
+  }) as unknown as ServerResponse;
+}
 
-    middleware(req, res, vi.fn());
+/** The id the middleware gave a request with the given headers. */
+function idFor(headers: Record<string, string>): string | undefined {
+  const req = fakeRequest(headers);
+  createHttpLogger()(req, fakeResponse(), vi.fn());
+  return (req as IncomingMessage & { id?: string }).id;
+}
 
-    const reqWithId = req as IncomingMessage & { id?: string };
-    const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    expect(reqWithId.id).toMatch(uuidV4Regex);
+describe('createHttpLogger — the request id', () => {
+  it('generates a UUID when the x-request-id header is absent', () => {
+    expect(idFor({})).toMatch(UUID_V4);
+  });
+
+  it('keeps an x-request-id that isTraceId accepts', () => {
+    expect(idFor({ 'x-request-id': 'my-trace-id-123' })).toBe('my-trace-id-123');
+  });
+
+  it('keeps an x-request-id of 64 characters, the longest accepted', () => {
+    const longest = 'a'.repeat(64);
+    expect(idFor({ 'x-request-id': longest })).toBe(longest);
+  });
+
+  it('replaces an x-request-id with a space by a UUID', () => {
+    expect(idFor({ 'x-request-id': 'has space' })).toMatch(UUID_V4);
+  });
+
+  it('replaces an x-request-id of 65 characters by a UUID', () => {
+    expect(idFor({ 'x-request-id': 'a'.repeat(65) })).toMatch(UUID_V4);
+  });
+
+  it('replaces an empty x-request-id by a UUID', () => {
+    expect(idFor({ 'x-request-id': '' })).toMatch(UUID_V4);
   });
 });
 
-describe('createHttpLogger — requestId from x-request-id header', () => {
-  it('uses the x-request-id header value as requestId when present', () => {
-    const middleware = createHttpLogger();
+describe('createHttpLogger — the trace id on the lines it writes', () => {
+  let stdoutChunks: string[];
 
-    const req = Object.assign(Object.create(null), {
-      headers: { 'x-request-id': 'my-trace-id-123' },
-      method: 'GET',
-      url: '/api/test',
-      socket: { remoteAddress: '127.0.0.1' },
-    }) as unknown as IncomingMessage;
+  beforeEach(() => {
+    stdoutChunks = [];
+    vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
+      stdoutChunks.push(typeof chunk === 'string'
+        ? chunk
+        : chunk.toString());
+      return true;
+    });
+  });
 
-    const res = Object.assign(Object.create(null), {
-      statusCode: 200,
-      setHeader: vi.fn(),
-      getHeader: vi.fn(),
-      on: vi.fn(),
-    }) as unknown as ServerResponse;
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
+  /** Runs one request through the middleware, logging a crumb through `req.log`. */
+  function runRequest(): { crumb: string; completion: string } {
+    const middleware = createHttpLogger({ logger: createLogger('svc', { format: 'json' }) });
+    const req = fakeRequest({ 'x-request-id': 'trace-abc' });
+    const res = fakeResponse();
     middleware(req, res, vi.fn());
+    (req as IncomingMessage & { log: Logger }).log.info({}, 'crumb');
+    res.emit('finish');
+    expect(stdoutChunks).toHaveLength(2);
+    return { crumb: stdoutChunks[0]!, completion: stdoutChunks[1]! };
+  }
 
-    const reqWithId = req as IncomingMessage & { id?: string };
-    expect(reqWithId.id).toBe('my-trace-id-123');
+  it('gives a crumb through req.log a traceId and no req or requestId', () => {
+    const crumb = JSON.parse(runRequest().crumb) as Record<string, unknown>;
+
+    expect(crumb['msg']).toBe('crumb');
+    expect(crumb['traceId']).toBe('trace-abc');
+    expect(crumb).not.toHaveProperty('req');
+    expect(crumb).not.toHaveProperty('requestId');
+  });
+
+  it('writes the "traceId" key once on the completion line, beside req, res and responseTime', () => {
+    const { completion } = runRequest();
+    const record = JSON.parse(completion) as Record<string, unknown>;
+
+    expect(completion.split('"traceId"')).toHaveLength(2);
+    expect(record['traceId']).toBe('trace-abc');
+    expect(record).toHaveProperty('req');
+    expect(record).toHaveProperty('res');
+    expect(record).toHaveProperty('responseTime');
+    expect(record).not.toHaveProperty('requestId');
   });
 });
 

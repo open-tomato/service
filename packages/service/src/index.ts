@@ -64,10 +64,12 @@ export {
   createConsoleLogger,
   DOMAIN_FIELD,
   inDomain,
+  isTraceId,
   SCOPE_FIELD,
   scoped,
   STEP_FIELD,
   TRACE_ID_FIELD,
+  TRACE_ID_PATTERN,
 } from './logger.js';
 export type { ConsoleLoggerOptions, LogBreadcrumb, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';

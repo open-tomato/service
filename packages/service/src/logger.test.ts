@@ -2,7 +2,17 @@ import type { LogSink } from './logger.js';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createConsoleLogger, DOMAIN_FIELD, inDomain, SCOPE_FIELD, scoped, STEP_FIELD, TRACE_ID_FIELD } from './logger.js';
+import {
+  createConsoleLogger,
+  DOMAIN_FIELD,
+  inDomain,
+  isTraceId,
+  SCOPE_FIELD,
+  scoped,
+  STEP_FIELD,
+  TRACE_ID_FIELD,
+  TRACE_ID_PATTERN,
+} from './logger.js';
 
 /** A sink that records every call, one array per console method. */
 function recordingSink() {
@@ -234,5 +244,28 @@ describe('inDomain', () => {
   it('names the domain and step fields domain and step', () => {
     expect(DOMAIN_FIELD).toBe('domain');
     expect(STEP_FIELD).toBe('step');
+  });
+});
+
+describe('isTraceId', () => {
+  it('holds the documented pattern', () => {
+    expect(TRACE_ID_PATTERN.source).toBe('^[A-Za-z0-9._:-]{1,64}$');
+  });
+
+  it('refuses an empty string, 65 characters, a space, an ESC character and a non-string', () => {
+    expect(isTraceId('')).toBe(false);
+    expect(isTraceId('a'.repeat(65))).toBe(false);
+    expect(isTraceId('a b')).toBe(false);
+    expect(isTraceId('a\u001Bb')).toBe(false);
+    expect(isTraceId(42)).toBe(false);
+    expect(isTraceId(undefined)).toBe(false);
+  });
+
+  it('accepts a UUID, a 55-character traceparent and a 64-character id', () => {
+    const traceparent = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01';
+    expect(traceparent).toHaveLength(55);
+    expect(isTraceId('3f2b8c1e-9d4a-4b7e-8f6a-1c2d3e4f5a6b')).toBe(true);
+    expect(isTraceId(traceparent)).toBe(true);
+    expect(isTraceId('a'.repeat(64))).toBe(true);
   });
 });

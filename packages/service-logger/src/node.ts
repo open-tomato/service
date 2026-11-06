@@ -6,11 +6,12 @@
  * instead (resolved automatically via the `browser` export condition).
  */
 import type { Decorator } from './decorators.js';
-import type { Logger, LoggerOptions, LogFormat, LogLevel, HttpLoggerOptions } from './types.js';
+import type { Logger, LoggerOptions, LogDestination, LogFormat, LogLevel, HttpLoggerOptions } from './types.js';
 
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
 
+import { isTraceId, TRACE_ID_FIELD } from '@open-tomato/service';
 import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 
@@ -23,11 +24,18 @@ function isLogFormat(value: string | undefined): value is LogFormat {
   return value !== undefined && LOG_FORMATS.has(value);
 }
 
+/** The process stream a destination names, looked up when called. */
+function streamFor(destination: LogDestination): typeof process.stdout | typeof process.stderr {
+  return destination === 'stderr'
+    ? process.stderr
+    : process.stdout;
+}
+
 /**
  * Pick the format: the `format` option, then `LOG_FORMAT`, then the legacy
- * `pretty` option, then whether stdout is a TTY.
+ * `pretty` option, then whether the chosen destination is a TTY.
  */
-function pickFormat(options: LoggerOptions | undefined): LogFormat {
+function pickFormat(options: LoggerOptions | undefined, destination: LogDestination): LogFormat {
   if (options?.format !== undefined) return options.format;
   const fromEnv = process.env['LOG_FORMAT'];
   if (isLogFormat(fromEnv)) return fromEnv;
@@ -36,39 +44,36 @@ function pickFormat(options: LoggerOptions | undefined): LogFormat {
       ? 'terminal'
       : 'json';
   }
-  return process.stdout.isTTY === true
+  return streamFor(destination).isTTY === true
     ? 'terminal'
     : 'json';
 }
 
 /**
- * A synchronous stream that writes each pino line to stdout through
- * `decorate`. stdout is read on every write, so a later swap of
- * `process.stdout.write` is honoured.
+ * A synchronous stream that writes each pino line to the destination,
+ * through the terminal decorator for `terminal` and unchanged for `json`.
+ * The process stream and its `write` are looked up on every write, so a
+ * later swap of `process.stdout.write` or `process.stderr.write` is honoured.
  */
-function decoratedStdout(decorate: Decorator): pino.DestinationStream {
+function destinationStream(format: LogFormat, destination: LogDestination): pino.DestinationStream {
+  const decorate: Decorator | undefined = format === 'terminal'
+    ? terminal
+    : undefined;
   return {
     write: (line: string) => {
-      process.stdout.write(decorate(line));
+      streamFor(destination).write(decorate === undefined
+        ? line
+        : decorate(line));
     },
   };
-}
-
-/**
- * The stream for a format: the terminal decorator over stdout, or
- * `undefined` for `json` so pino writes its own record to stdout.
- */
-function channelFor(format: LogFormat): pino.DestinationStream | undefined {
-  return format === 'terminal'
-    ? decoratedStdout(terminal)
-    : undefined;
 }
 
 /**
  * Create a named pino logger bound to the given service name.
  *
  * @param name - Service identifier attached to every log entry as `service`.
- * @param options - Optional configuration overrides (level, context, format).
+ * @param options - Optional configuration overrides (level, context, format,
+ *   destination).
  * @returns A {@link Logger} instance configured for Node.js output.
  *
  * @example
@@ -84,11 +89,10 @@ export function createLogger(name: string, options?: LoggerOptions): Logger {
     base: { service: name, ...options?.context },
     serializers: { err: pino.stdSerializers.errWithCause },
   };
-  const channel = channelFor(pickFormat(options));
+  const destination: LogDestination = options?.destination ?? 'stdout';
+  const channel = destinationStream(pickFormat(options, destination), destination);
 
-  return (channel === undefined
-    ? pino(pinoOptions)
-    : pino(pinoOptions, channel)) as unknown as Logger;
+  return pino(pinoOptions, channel) as unknown as Logger;
 }
 
 /** Header paths redacted from HTTP log entries by default. */
@@ -105,10 +109,13 @@ const DEFAULT_IGNORE_ROUTES = ['/_health', '/_control'];
  * Create a pino-http Express/Connect middleware that logs incoming requests and
  * outgoing responses.
  *
- * **Request-id propagation:** The middleware reads the `x-request-id` header and
- * uses it as the request id; if absent, a `crypto.randomUUID()` value is
- * generated. The id is exposed as `req.id` and merged into the child logger
- * attached at `req.log`.
+ * **Trace-id propagation:** The middleware takes the `x-request-id` header as
+ * the request id when `isTraceId` from `@open-tomato/service` accepts it
+ * (`[A-Za-z0-9._:-]{1,64}`); otherwise it generates a `crypto.randomUUID()`
+ * value. The id is exposed as `req.id`, and `req.log` binds only that id, as
+ * `traceId` (`quietReqLogger`), so a crumb logged through it carries no `req`.
+ * The completion line carries `req`, `res` and `responseTime` under the same
+ * `traceId`.
  *
  * **Redaction:** Sensitive headers (`authorization`, `cookie`, `x-api-key`) are
  * redacted by default. Additional paths can be passed via `options.redact` or
@@ -137,10 +144,16 @@ export function createHttpLogger(options?: HttpLoggerOptions) {
   return pinoHttp({
     logger: options?.logger as pino.Logger | undefined,
     redact: [...DEFAULT_REDACT_PATHS, ...optionsRedact, ...envRedact],
-    genReqId: (req) => (req.headers['x-request-id'] as string | undefined) ?? randomUUID(),
-    customProps: (req) => ({ requestId: (req as { id?: string }).id }),
+    genReqId: (req) => {
+      const header = req.headers['x-request-id'];
+      return isTraceId(header)
+        ? header
+        : randomUUID();
+    },
+    quietReqLogger: true,
+    customAttributeKeys: { reqId: TRACE_ID_FIELD },
     autoLogging: { ignore: (req) => ignoreRoutes.some((r) => (req.url ?? '').startsWith(r)) },
   });
 }
 
-export type { Logger, LogLevel, LogContext, LogFormat, LoggerOptions, HttpLoggerOptions } from './types.js';
+export type { Logger, LogLevel, LogContext, LogDestination, LogFormat, LoggerOptions, HttpLoggerOptions } from './types.js';

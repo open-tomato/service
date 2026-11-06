@@ -4,6 +4,7 @@ import type { Mock } from 'vitest';
 import process from 'node:process';
 
 import { PortInUseError } from '@open-tomato/service';
+import { createLogger } from '@open-tomato/service-logger';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMCP } from '../src/create-mcp.js';
@@ -334,14 +335,72 @@ describe('createMCP', () => {
     expect(handle.healthUrl()).toBe('http://localhost:3005/health');
   });
 
-  it('resolves ready() with the transport alone in stdio mode, with no banner', async () => {
+  it('resolves ready() with the transport alone in stdio mode', async () => {
     vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
 
     const handle = createMCP(makeConfig());
 
     await expect(handle.ready()).resolves.toEqual({ transport: 'stdio' });
     expect(handle.healthUrl()).toBe('');
+  });
+
+  it('logs the stdio started record with transport stdio and no url once connected', async () => {
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    const handle = createMCP(makeConfig({ version: '1.4.0', features: { search: true } }));
+    await handle.ready();
+
+    expect(startedRecords()).toEqual([{
+      service: 'test-mcp',
+      version: '1.4.0',
+      transport: 'stdio',
+      features: { search: true },
+    }]);
+  });
+
+  it('writes no stdio started record before the transport is connected', async () => {
+    const { wireStdioTransport } = await import('../src/transport.js');
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+    vi.mocked(wireStdioTransport).mockRejectedValueOnce(new Error('no stdin'));
+
+    const handle = createMCP(makeConfig());
+
+    await expect(handle.ready()).rejects.toThrow('no stdin');
     expect(startedRecords()).toEqual([]);
+  });
+
+  // The logger's destination
+
+  it('resolves the transport once, before the logger is built', () => {
+    createMCP(makeConfig());
+
+    expect(resolveTransport).toHaveBeenCalledOnce();
+    expect(vi.mocked(resolveTransport).mock.invocationCallOrder[0])
+      .toBeLessThan(vi.mocked(createLogger).mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it('hands createLogger destination stderr on stdio', () => {
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    createMCP(makeConfig());
+
+    expect(createLogger).toHaveBeenCalledWith('test-mcp', { destination: 'stderr' });
+  });
+
+  it('hands createLogger destination stdout on HTTP', () => {
+    vi.mocked(resolveTransport).mockReturnValueOnce('http');
+
+    createMCP(makeConfig({ logger: { format: 'json' } }));
+
+    expect(createLogger).toHaveBeenCalledWith('test-mcp', { format: 'json', destination: 'stdout' });
+  });
+
+  it('lets a destination in the logger config win over the stdio pick', () => {
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    createMCP(makeConfig({ logger: { destination: 'stdout' } }));
+
+    expect(createLogger).toHaveBeenCalledWith('test-mcp', { destination: 'stdout' });
   });
 
   it('logs one started record with the bound URLs, version and features', async () => {

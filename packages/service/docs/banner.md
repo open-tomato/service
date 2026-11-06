@@ -1,9 +1,12 @@
 # banner
 
 `logStarted(logger, banner)` writes the startup banner: one `info` record
-with message `started` and the fields `service`, `version`, `transport`,
-`url` and `features`. `fallbackPort`, the port asked for, is present only
-when the service fell back from it to the port in `url`. The fields in
+with message `started` and the fields `service`, `version`, `transport`
+and `features`. `url` is optional: it is written when the banner sets it,
+and left out of the record, with no `url` key, for a service that has no
+address, such as an MCP server on stdio (transport `stdio`). `fallbackPort`,
+the port asked for, is present only when the service fell back from it to
+the port in `url`. The fields in
 `banner.extra` are merged in too, and a named field wins over an extra field
 of the same name.
 
@@ -17,7 +20,8 @@ the record as a banner block; the JSON decorator keeps it as is.
 
 `src/banner.test.ts` passes a recording `Logger` and checks the one record:
 its level, its message and its fields, with and without `fallbackPort`,
-and with an extra field that clashes with a named one.
+with no `url` (the record then has no `url` key), and with an extra field
+that clashes with a named one.
 
 ## Usage
 

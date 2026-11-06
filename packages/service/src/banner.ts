@@ -12,8 +12,11 @@ export interface StartupBanner {
   readonly version: string;
   /** How the service is reached, such as `http` or `mcp`. */
   readonly transport: string;
-  /** The URL the service listens on. */
-  readonly url: string;
+  /**
+   * The URL the service listens on; left out by a service with no address,
+   * such as one on stdio.
+   */
+  readonly url?: string;
   /** The features the service runs with. */
   readonly features: Readonly<Record<string, BannerFeatureValue>>;
   /** The port that was asked for, set only when the service fell back from it. */
@@ -27,6 +30,8 @@ export const STARTED_MESSAGE = 'started';
 
 /**
  * Writes the startup banner as one `info` record with message `started`.
+ *
+ * `url` and `fallbackPort` are written only when the banner sets them.
  *
  * @param logger - The logger to write to.
  * @param banner - What the service says about itself.
@@ -50,7 +55,9 @@ export function logStarted(logger: Logger, banner: StartupBanner): void {
     service: banner.service,
     version: banner.version,
     transport: banner.transport,
-    url: banner.url,
+    ...(banner.url === undefined
+      ? {}
+      : { url: banner.url }),
     features: banner.features,
     ...(banner.fallbackPort === undefined
       ? {}

@@ -172,6 +172,36 @@ function formatFields(record: LogRecord, keys: readonly string[], paint: Paint):
   return keys.map(key => `${paint('dim', `${key}=`)}${formatValue(record[key])}`);
 }
 
+/** The record keys the request tail draws, left out of the fields when it is drawn. */
+const REQUEST_KEYS: ReadonlySet<string> = new Set(['req', 'res', 'responseTime']);
+
+/** What joins the method and URL to the response status in the request tail. */
+const STATUS_ARROW = '→';
+
+/**
+ * The request tail `<method> <url>`, then `→ <statusCode>` when `res` has
+ * one, then `<responseTime>ms` when the record has one, as
+ * `POST /users → 201 3ms`; `undefined` when `req` lacks a string `method`
+ * or `url`.
+ */
+function requestTail(record: LogRecord): string | undefined {
+  const { req, res, responseTime } = record;
+  if (!isRecord(req) || typeof req.method !== 'string' || typeof req.url !== 'string') return undefined;
+  const statusCode = isRecord(res)
+    ? res.statusCode
+    : undefined;
+  return [
+    req.method,
+    req.url,
+    ...(typeof statusCode === 'number'
+      ? [STATUS_ARROW, String(statusCode)]
+      : []),
+    ...(typeof responseTime === 'number'
+      ? [`${responseTime}ms`]
+      : []),
+  ].join(' ');
+}
+
 /** What separates the time, the level and the slots after them. */
 const HEAD_SEPARATOR = ' ';
 
@@ -240,8 +270,9 @@ function errorLines(err: unknown, paint: Paint): string[] {
   return lines;
 }
 
+/** The `started` record `logStarted` writes: message `started` and a string `transport`. */
 function isBanner(record: LogRecord): boolean {
-  return record.msg === STARTED_MESSAGE && typeof record.url === 'string';
+  return record.msg === STARTED_MESSAGE && typeof record.transport === 'string';
 }
 
 function formatFeatures(features: unknown): string {
@@ -276,7 +307,17 @@ function drawBanner(record: LogRecord, paint: Paint): string {
 }
 
 function drawLine(record: LogRecord, paint: Paint): string {
-  const slots = [...bodySlots(record, paint), ...formatFields(record, fieldKeys(record), paint)];
+  const tail = requestTail(record);
+  const keys = tail === undefined
+    ? fieldKeys(record)
+    : fieldKeys(record).filter(key => !REQUEST_KEYS.has(key));
+  const slots = [
+    ...bodySlots(record, paint),
+    ...formatFields(record, keys, paint),
+    ...(tail === undefined
+      ? []
+      : [tail]),
+  ];
   return [joinLine(record, slots, paint), ...errorLines(record.err, paint)].join('\n');
 }
 
@@ -293,9 +334,12 @@ export const json: Decorator = line => line;
  *
  * The line reads time, level, service, the first 8 characters of the trace
  * id, the signature (`domain`, `scope` and `step` joined by `:`), message,
- * then the other fields as `key=value`; a missing slot is dropped. The serialised `err` and each link of its `cause` chain follow
- * as one `<type>: <message>` line each, and a `started` record is drawn as a
- * short block. Colour is off when `NO_COLOR` is set to a non-empty value.
+ * then the other fields as `key=value`; a missing slot is dropped. A record
+ * whose `req` has a string `method` and `url` ends in the request tail,
+ * `POST /users → 201 3ms`, and its `req`, `res` and `responseTime` are not
+ * drawn as fields. The serialised `err` and each link of its `cause` chain
+ * follow as one `<type>: <message>` line each, and a `started` record is drawn
+ * as a short block. Colour is off when `NO_COLOR` is set to a non-empty value.
  *
  * @param line - One pino record line.
  * @returns The drawn text ending in a newline, or the line itself when it is

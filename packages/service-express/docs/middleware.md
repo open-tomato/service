@@ -16,16 +16,31 @@ headers are redacted from every record.
 ## Request ids
 
 `genRequestId(req, res)` picks each request's id: the `x-request-id` header
-when the request carries a non-empty one, else a new `randomUUID()`. It sets
-the same id on the response's `x-request-id` header. pino-http stores it as
-`req.id`, and `customProps` binds it as `traceId` (the core's
-`TRACE_ID_FIELD`) on `req.log`, so every record a route writes through
-`req.log`, and the `request completed` record, carry it.
+when the core's `isTraceId` accepts it (`[A-Za-z0-9._:-]{1,64}`, the core's
+`TRACE_ID_PATTERN`), else a new `randomUUID()`. A header that is missing,
+empty, holds a space or runs past 64 characters is replaced, never logged.
+It sets the id it chose on the response's `x-request-id` header, so a caller
+whose id was refused reads the replacement there.
+
+pino-http stores the id as `req.id` and runs with `quietReqLogger: true` and
+`customAttributeKeys: { reqId: TRACE_ID_FIELD }`. So `req.log` binds only
+`traceId` (the core's `TRACE_ID_FIELD`): a crumb a route writes through
+`req.log` carries `traceId` and not the whole request. The `request completed`
+line is written through a child of that logger, and carries `req`, `res` and
+`responseTime` with `traceId` once.
 
 ## Tests
 
 `src/middleware.test.ts` runs the stack under supertest over a real pino
 logger writing into memory. It reads that the request log goes through the
 given logger, that credential headers are redacted (with the logged service
-name as the control), that a given `x-request-id` is echoed and logged as
-`traceId`, and that a missing or empty one gets a fresh UUID per request.
+name as the control), that a valid `x-request-id` is echoed and logged as
+`traceId`, that a missing, empty, spaced or 65-character one is replaced by
+a fresh UUID the response echoes, that a crumb through `req.log` holds
+`traceId` and no `req`, and that the `request completed` record holds `req`,
+`res` and `responseTime`, with the `"traceId"` key once in its raw JSON line.
+`tests/breadcrumb.integration.test.ts` reads the same through
+`scoped(inDomain(req.log, 'Users'), 'create')`, concurrent requests included.
+`tests/terminal-lines.integration.test.ts` runs the stack under the `terminal`
+format and checks that each request draws short lines, with no `req=` or
+`res=` and one `POST /users → 201 Nms` tail.

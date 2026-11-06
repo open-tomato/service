@@ -18,6 +18,12 @@ export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal' |
 export type LogFormat = 'terminal' | 'json';
 
 /**
+ * The process stream the node entry writes records to. The browser entry
+ * ignores it.
+ */
+export type LogDestination = 'stdout' | 'stderr';
+
+/**
  * Arbitrary structured key-value pairs that can be attached to log entries
  * as contextual metadata (e.g. `requestId`, `userId`, `tenantId`).
  */
@@ -79,7 +85,8 @@ export interface LoggerOptions {
   /**
    * How records are written: `'terminal'` draws a line for a person, `'json'`
    * writes pino's JSON record. When omitted, `LOG_FORMAT` decides, then
-   * `pretty`, then whether stdout is a TTY. Has no effect in the browser entry.
+   * `pretty`, then whether the `destination` stream is a TTY. Has no effect in
+   * the browser entry.
    */
   format?: LogFormat
   /**
@@ -90,6 +97,11 @@ export interface LoggerOptions {
    * @deprecated Use `format`.
    */
   pretty?: boolean
+  /**
+   * The process stream records are written to, `'stdout'` or `'stderr'`.
+   * Defaults to `'stdout'`. Ignored by the browser entry.
+   */
+  destination?: LogDestination
 }
 
 /**
