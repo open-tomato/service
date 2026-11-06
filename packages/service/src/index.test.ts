@@ -9,6 +9,7 @@ import * as errorClient from './error-client.js';
 import * as errorResponse from './error-response.js';
 import * as errors from './errors.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
+import { SCOPE_FIELD, scoped, TRACE_ID_FIELD } from './logger.js';
 import { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
@@ -71,6 +72,12 @@ describe('public exports', () => {
   it('exports the startup banner', () => {
     expect(core.logStarted).toBe(logStarted);
     expect(core.STARTED_MESSAGE).toBe(STARTED_MESSAGE);
+  });
+
+  it('exports the log breadcrumbs', () => {
+    expect(core.scoped).toBe(scoped);
+    expect(core.SCOPE_FIELD).toBe(SCOPE_FIELD);
+    expect(core.TRACE_ID_FIELD).toBe(TRACE_ID_FIELD);
   });
 
   it('exports the CircuitState type', () => {
