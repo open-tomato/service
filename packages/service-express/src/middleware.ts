@@ -6,7 +6,7 @@ import type { Logger as PinoLogger } from 'pino';
 
 import { randomUUID } from 'node:crypto';
 
-import { TRACE_ID_FIELD } from '@open-tomato/service';
+import { isTraceId, TRACE_ID_FIELD } from '@open-tomato/service';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -25,8 +25,9 @@ const REDACTED_HEADERS = [
 export const REQUEST_ID_HEADER = 'x-request-id';
 
 /**
- * Picks the id of a request: its `x-request-id` header when it carries one,
- * else a new UUID. The response answers with the same id on `x-request-id`.
+ * Picks the id of a request: its `x-request-id` header when `isTraceId` from
+ * `@open-tomato/service` accepts it (`[A-Za-z0-9._:-]{1,64}`), else a new UUID.
+ * The response answers with the id chosen, on `x-request-id`.
  *
  * @param req - The incoming request.
  * @param res - The response the id is echoed on.
@@ -34,7 +35,7 @@ export const REQUEST_ID_HEADER = 'x-request-id';
  */
 export function genRequestId(req: IncomingMessage, res: ServerResponse): string {
   const header = req.headers[REQUEST_ID_HEADER];
-  const id = typeof header === 'string' && header !== ''
+  const id = isTraceId(header)
     ? header
     : randomUUID();
   res.setHeader(REQUEST_ID_HEADER, id);
@@ -52,7 +53,9 @@ export function genRequestId(req: IncomingMessage, res: ServerResponse): string 
  * 5. `cookie-parser` — parses Cookie headers
  * 6. `express-rate-limit` — limits requests per window (default 100 req / 60 s)
  * 7. `pino-http` — request/response logging through the service logger; each request
- *    gets an id from {@link genRequestId}, and `req.log` binds it as `traceId`
+ *    gets an id from {@link genRequestId}, and `req.log` binds only that id, as `traceId`
+ *    (`quietReqLogger`), so a crumb carries no `req`; the `request completed` line
+ *    carries `req`, `res` and `responseTime` under the same `traceId`
  *
  * @param app - The Express application to configure.
  * @param config - Resolved service configuration.
@@ -81,7 +84,8 @@ export function applyMiddleware(
     logger: logger as unknown as PinoLogger,
     redact: REDACTED_HEADERS,
     genReqId: genRequestId,
-    customProps: (req) => ({ [TRACE_ID_FIELD]: String(req.id) }),
+    quietReqLogger: true,
+    customAttributeKeys: { reqId: TRACE_ID_FIELD },
   }));
 }
 

@@ -160,10 +160,11 @@ itself, since pino's JSON is not readable by a person. `NODE_ENV` plays no
 part, so a service run by hand in a terminal prints readable lines whatever
 its environment.
 
-Each request gets an id: its `x-request-id` header when it carries one, else
-a new UUID. The response answers with the same `x-request-id`, and `req.log`
-binds the id as `traceId`, so every record a route writes through `req.log`
-carries it. A terminal line shows the first 8 characters of it.
+Each request gets an id: its `x-request-id` header when it matches
+`[A-Za-z0-9._:-]{1,64}`, else a new UUID. The response answers with the id
+chosen on `x-request-id`, and `req.log` binds only that id, as `traceId`, so
+every record a route writes through `req.log` carries it and not the request;
+the `request completed` line carries `req`, `res` and `responseTime`. A terminal line shows the first 8 characters of it.
 
 A logger from `scoped(inDomain(logger, 'Orders'), 'create')`, with both
 imported from `@open-tomato/service` (this package does not re-export them),

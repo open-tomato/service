@@ -113,6 +113,52 @@ describe('applyMiddleware — request logging', () => {
     expect(res.headers[REQUEST_ID_HEADER]).toMatch(UUID);
   });
 
+  it.each([
+    ['holds a space', 'trace abc'],
+    ['is 65 characters long', 'a'.repeat(65)],
+  ])('replaces an x-request-id that %s with a UUID the response echoes', async (_case, given) => {
+    const res = await request(buildApp(captured.logger)).get('/')
+      .set(REQUEST_ID_HEADER, given);
+
+    const id = res.headers[REQUEST_ID_HEADER] as string | undefined;
+    expect(id).toMatch(UUID);
+    expect(id).not.toBe(given);
+    const records = captured.records();
+    expect(routeRecord(records)?.['traceId']).toBe(id);
+    expect(completedRecord(records)?.['traceId']).toBe(id);
+  });
+
+  it('keeps a 64-character x-request-id, the control for the 65-character case', async () => {
+    const given = 'a'.repeat(64);
+    const res = await request(buildApp(captured.logger)).get('/')
+      .set(REQUEST_ID_HEADER, given);
+
+    expect(res.headers[REQUEST_ID_HEADER]).toBe(given);
+  });
+
+  it('binds only traceId on req.log, so a crumb carries no req', async () => {
+    const res = await request(buildApp(captured.logger)).get('/')
+      .set(REQUEST_ID_HEADER, 'trace-abc');
+
+    expect(res.status).toBe(200);
+    const crumb = routeRecord(captured.records());
+    expect(crumb).toMatchObject({ traceId: 'trace-abc', msg: 'in route' });
+    expect(crumb).not.toHaveProperty('req');
+    expect(crumb).not.toHaveProperty('res');
+  });
+
+  it('writes req, res and responseTime on the request completed record, with traceId once', async () => {
+    await request(buildApp(captured.logger)).get('/')
+      .set(REQUEST_ID_HEADER, 'trace-abc');
+
+    const completed = completedRecord(captured.records());
+    expect(completed).toMatchObject({ traceId: 'trace-abc', req: { method: 'GET', url: '/' }, res: { statusCode: 200 } });
+    expect(typeof completed?.['responseTime']).toBe('number');
+    const line = captured.lines.find((l) => l.includes('"request completed"'));
+    expect(line).toBeDefined();
+    expect(line?.split('"traceId"')).toHaveLength(2);
+  });
+
   it('gives each request without x-request-id its own id', async () => {
     const app = buildApp(captured.logger);
     const first = await request(app).get('/');

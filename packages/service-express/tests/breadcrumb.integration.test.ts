@@ -15,7 +15,7 @@ const SERVICE_ID = 'breadcrumb-test';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 /** A real pino logger writing into memory, with a reader for its records. */
-function captureLogger(): { logger: Logger, records: () => Record<string, unknown>[] } {
+function captureLogger(): { logger: Logger, lines: string[], records: () => Record<string, unknown>[] } {
   const lines: string[] = [];
   const stream = new Writable({
     write(chunk: Buffer, _encoding, callback) {
@@ -24,7 +24,7 @@ function captureLogger(): { logger: Logger, records: () => Record<string, unknow
     },
   });
   const logger = pino({ level: 'debug', base: { service: SERVICE_ID } }, stream) as unknown as Logger;
-  return { logger, records: () => lines.map((line) => JSON.parse(line) as Record<string, unknown>) };
+  return { logger, lines, records: () => lines.map((line) => JSON.parse(line) as Record<string, unknown>) };
 }
 
 /** An app whose route waits for a release gate, then logs through `scoped(inDomain(req.log, 'Users'), 'create')`. */
@@ -44,6 +44,10 @@ function buildApp(
     res.status(201).json({ ok: true });
   });
   return app;
+}
+
+function completedRecords(records: Record<string, unknown>[]): Record<string, unknown>[] {
+  return records.filter((r) => r['msg'] === 'request completed');
 }
 
 function createRecords(records: Record<string, unknown>[]): Record<string, unknown>[] {
@@ -67,6 +71,39 @@ describe('Express breadcrumbs (integration)', () => {
     expect(insert).toMatchObject({
       traceId: 'trace-abc', domain: 'Users', scope: 'create', step: 'insert', level: 30, msg: 'user created',
     });
+    for (const crumb of [validate, insert]) {
+      expect(crumb).not.toHaveProperty('req');
+      expect(crumb).not.toHaveProperty('res');
+    }
+  });
+
+  it('writes req, res and responseTime on the completion line, with traceId once', async () => {
+    const { logger, lines, records } = captureLogger();
+
+    await request(buildApp(logger)).post('/users')
+      .set(REQUEST_ID_HEADER, 'trace-abc');
+
+    const [completed, ...rest] = completedRecords(records());
+    expect(rest).toHaveLength(0);
+    expect(completed).toMatchObject({
+      traceId: 'trace-abc', req: { method: 'POST', url: '/users' }, res: { statusCode: 201 },
+    });
+    expect(typeof completed?.['responseTime']).toBe('number');
+    const line = lines.find((l) => l.includes('"request completed"'));
+    expect(line?.split('"traceId"')).toHaveLength(2);
+  });
+
+  it('replaces a refused x-request-id with a UUID the response echoes', async () => {
+    const { logger, records } = captureLogger();
+
+    const res = await request(buildApp(logger)).post('/users')
+      .set(REQUEST_ID_HEADER, 'trace abc');
+
+    const id = res.headers[REQUEST_ID_HEADER];
+    expect(id).toMatch(UUID);
+    for (const record of [...createRecords(records()), ...completedRecords(records())]) {
+      expect(record['traceId']).toBe(id);
+    }
   });
 
   it('generates a new UUID traceId when the request carries no id', async () => {
