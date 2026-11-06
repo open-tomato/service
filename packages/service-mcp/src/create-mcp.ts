@@ -1,7 +1,8 @@
 import type { HealthServerHandle } from './health.js';
 import type { HttpTransportHandle } from './transport.js';
-import type { MCPAddress, MCPConfig, MCPHandle, ResolvedMCPConfig } from './types.js';
+import type { MCPAddress, MCPConfig, MCPHandle, MCPTransport, ResolvedMCPConfig } from './types.js';
 import type { ClientsMap, Logger, TypedClient } from '@open-tomato/service';
+import type { LoggerOptions } from '@open-tomato/service-logger';
 
 import process from 'node:process';
 
@@ -69,13 +70,32 @@ function logHttpStarted(
 }
 
 /**
+ * The logger options for `transport`: `destination` is `'stderr'` on stdio,
+ * where stdout carries the protocol, and `'stdout'` on HTTP. A `destination`
+ * in `options` wins over the pick.
+ *
+ * @param transport - The transport the server will wire.
+ * @param options - The `logger` config, if any.
+ * @returns The options to hand `createLogger`.
+ */
+function loggerOptionsFor(transport: MCPTransport, options: LoggerOptions | undefined): LoggerOptions {
+  const picked = transport === 'stdio'
+    ? 'stderr'
+    : 'stdout';
+  return { ...options, destination: options?.destination ?? picked };
+}
+
+/**
  * Creates and auto-starts an MCP server from the provided configuration.
  *
  * The server starts immediately upon calling this function — no explicit
  * `start()` call is needed. It progresses through six lifecycle phases:
  *
  * **1. Init** — `config` is validated and defaulted via `MCPConfigSchema`.
- * A scoped logger is created from `serviceId` and the optional `logger` config.
+ * The transport is picked once, by `resolveTransport()`, and that pick picks
+ * the logger's destination: stderr on stdio, where stdout carries the
+ * protocol, and stdout on HTTP; a `destination` in the `logger` config wins.
+ * A scoped logger is created from `serviceId` and the `logger` config.
  * The `clients` array is indexed into a `ClientsMap` keyed by each client's
  * `name` property (set when the client was constructed via `createHttpClient`).
  *
@@ -83,8 +103,8 @@ function logHttpStarted(
  * resources, and prompts here. If this callback throws or rejects, the start
  * fails and the health server is never started.
  *
- * **3. Transport** — the transport is selected based on the `MCP_TRANSPORT`
- * environment variable:
+ * **3. Transport** — the transport picked at Init is wired; the pick follows
+ * the `MCP_TRANSPORT` environment variable:
  * - _(default)_ `MCP_TRANSPORT` unset or any value other than `'stdio'`:
  *   `StreamableHTTPServerTransport` in stateful mode
  *   (`sessionIdGenerator: () => randomUUID()`), served by a Node HTTP server
@@ -102,9 +122,10 @@ function logHttpStarted(
  * **5. Started** — once both servers listen in HTTP mode, `logStarted` writes
  * the `started` banner with the bound URLs, the `version` and `features`, and
  * `fallbackPort` and `healthFallbackPort` for a server that fell back, and
- * `ready()` resolves with the bound address. In `stdio` mode `ready()`
- * resolves once the transport is connected, with no banner, since stdout
- * carries the protocol. A failed start rejects `ready()`, logs the error and,
+ * `ready()` resolves with the bound address. In `stdio` mode, once the
+ * transport is connected, `logStarted` writes the `started` banner with
+ * transport `stdio` and no `url` through the logger, which writes to stderr
+ * there, and `ready()` resolves. A failed start rejects `ready()`, logs the error and,
  * outside `NODE_ENV=test`, exits the process with code 1; a health server that
  * cannot listen closes the transport first.
  *
@@ -158,7 +179,8 @@ function logHttpStarted(
 export function createMCP(config: MCPConfig): MCPHandle {
   const resolved = MCPConfigSchema.parse(config);
   const ports = resolvePortConfig(resolved);
-  const logger = createLogger(resolved.serviceId, resolved.logger);
+  const transport = resolveTransport();
+  const logger = createLogger(resolved.serviceId, loggerOptionsFor(transport, resolved.logger));
   const clientsMap = buildClientsMap(resolved.clients);
   const server = new McpServer({ name: resolved.serviceId, version: resolved.version });
 
@@ -194,14 +216,20 @@ export function createMCP(config: MCPConfig): MCPHandle {
 
   /**
    * Initialises the server: invokes `setup`, wires the transport, starts the
-   * health server and writes the banner (HTTP mode only).
+   * health server (HTTP mode only) and writes the banner.
    */
   async function start(): Promise<MCPAddress> {
     await resolved.setup(server, { logger, clients: clientsMap });
 
-    if (resolveTransport() === 'stdio') {
+    if (transport === 'stdio') {
       transportInstance = await wireStdioTransport(server);
       address = { transport: 'stdio' };
+      logStarted(logger, {
+        service: resolved.serviceId,
+        version: resolved.version,
+        transport: 'stdio',
+        features: resolved.features,
+      });
       return address;
     }
 

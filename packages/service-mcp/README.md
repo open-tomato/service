@@ -42,9 +42,9 @@ transport, on `port`, else `PORT`, else `8080`; it answers on any path, so
 clients can use `http://localhost:8080/mcp`. With `MCP_TRANSPORT=stdio` it
 talks over stdin and stdout instead, which is how desktop MCP clients start
 a local server. Under stdio, anything on stdout that is not protocol breaks
-the session, and the server's logger writes to stdout today, whatever
-`LOG_FORMAT` says. Run a stdio server with `LOG_LEVEL=silent`, or log from
-your tools to stderr, until the logger moves there.
+the session, so there the server's logger writes to stderr, the `logger`
+that `setup` receives included; a `destination` in the `logger` config
+overrides that.
 
 ## Calling other services from a tool
 
@@ -126,7 +126,8 @@ with the message `started`, the startup banner:
 - `healthFallbackPort`, the health port that was asked for, present only
   after the health server fell back.
 
-In `stdio` mode there is no banner, since stdout carries the protocol.
+In `stdio` mode the same record is written to stderr once the transport is
+connected, with `transport` `stdio` and no `url` or health fields.
 
 `ready()` resolves with the bound address once the servers listen: the
 `transport`, and in HTTP mode the transport's `port` and `url` and the health
@@ -160,8 +161,8 @@ custom setups.
 
 The logger reads `LOG_LEVEL` (default `info`). Its format is picked once:
 `LOG_FORMAT=terminal` or `LOG_FORMAT=json` picks one outright. Without it, a
-terminal on stdout gets readable, coloured lines, and anything else gets
-pino's JSON records. A pipe stays JSON on purpose: whatever takes the records
+terminal on the logger's stream, stdout or under stdio stderr, gets
+readable, coloured lines, and anything else gets pino's JSON records. A pipe stays JSON on purpose: whatever takes the records
 into a logging system should get the raw records and decorate them itself,
 since pino's JSON is not readable by a person. `NODE_ENV` plays no part, so a
 server run by hand in a terminal prints readable lines whatever its
