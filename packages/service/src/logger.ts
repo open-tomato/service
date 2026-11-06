@@ -129,6 +129,25 @@ export function createConsoleLogger(name: string, options: ConsoleLoggerOptions 
 /** The record field that carries the request's trace id. */
 export const TRACE_ID_FIELD = 'traceId';
 
+/** The shape a trace id must have: 1 to 64 letters, digits, `.`, `_`, `:` or `-`. */
+export const TRACE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+
+/**
+ * Tells whether `value` is a trace id an adapter may adopt from a request.
+ *
+ * @param value - The candidate, such as an `x-request-id` header value.
+ * @returns `true` when `value` is a string matching {@link TRACE_ID_PATTERN}.
+ *
+ * @example
+ * ```ts
+ * isTraceId('t-1'); // true
+ * isTraceId('a b'); // false
+ * ```
+ */
+export function isTraceId(value: unknown): value is string {
+  return typeof value === 'string' && TRACE_ID_PATTERN.test(value);
+}
+
 /** The record field that names the entry point of a file's workflow, such as `create`. */
 export const SCOPE_FIELD = 'scope';
 

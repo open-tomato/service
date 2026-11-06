@@ -30,6 +30,12 @@ log.info({ step: 'insert', userId: 'u-1' }, 'user created');
 
 `LogBreadcrumb` types the four fields, each an optional string.
 
+An adapter adopts a trace id from a request (its `x-request-id`) only when
+`isTraceId` accepts it: a string matching `TRACE_ID_PATTERN`,
+`/^[A-Za-z0-9._:-]{1,64}$/`. That admits a UUID and a W3C `traceparent`
+value (55 characters) and keeps spaces and control characters, such as ESC,
+out of the logs. Anything else is replaced by an id the adapter makes.
+
 `inDomain` and `scoped` both return a child, and a child's bindings win
 over its parent's: calling `inDomain` on a domain logger replaces the domain
 and keeps the trace id and the scope, and scoping a scoped logger replaces

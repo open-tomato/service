@@ -9,7 +9,7 @@ import * as errorClient from './error-client.js';
 import * as errorResponse from './error-response.js';
 import * as errors from './errors.js';
 import { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
-import { DOMAIN_FIELD, inDomain, SCOPE_FIELD, scoped, STEP_FIELD, TRACE_ID_FIELD } from './logger.js';
+import { DOMAIN_FIELD, inDomain, isTraceId, SCOPE_FIELD, scoped, STEP_FIELD, TRACE_ID_FIELD, TRACE_ID_PATTERN } from './logger.js';
 import { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
 import { withRetry } from './retry.js';
 import { createRuntime } from './runtime.js';
@@ -81,6 +81,8 @@ describe('public exports', () => {
     expect(core.inDomain).toBe(inDomain);
     expect(core.DOMAIN_FIELD).toBe(DOMAIN_FIELD);
     expect(core.STEP_FIELD).toBe(STEP_FIELD);
+    expect(core.TRACE_ID_PATTERN).toBe(TRACE_ID_PATTERN);
+    expect(core.isTraceId).toBe(isTraceId);
   });
 
   it('exports the CircuitState type', () => {
