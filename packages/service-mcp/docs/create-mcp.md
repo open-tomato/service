@@ -65,14 +65,24 @@ after `ready()`, the one `started` record with and without both
 fallbacks, the `stdio` record with no `url` and its absence when the stdio
 transport fails, that the transport is resolved once and before the
 logger is built, the options `createLogger` receives on stdio, on HTTP
-and on stdio with `logger: { destination: 'stdout' }`, the `version` and `features` defaults, the version handed to
-`McpServer`, the exit outside `NODE_ENV=test` and its absence under it,
+and on stdio with `logger: { destination: 'stdout' }`, the `version` and
+`features` defaults, the version handed to `McpServer`, the exit outside
+`NODE_ENV=test` and its absence under it,
 that the transport is closed when the health server fails, and that an
 unawaited failure raises no `unhandledRejection`. Removing the rejection
 handler, the test-mode guard, the transport close, the configured version,
 `healthFallbackPort`, the bound `healthUrl`, the stderr pick, the config's
 precedence over it or the absence of `url` on the stdio record each fails
 at least one case.
+
+`tests/createMCP.destination.test.ts` runs the start through the real logger
+and checks which stream the `setup` line, the `started` banner and the
+shutdown lines reach: stderr only on stdio, stdout on HTTP, and stdout on
+stdio when `logger: { destination: 'stdout' }` names it.
+`tests/stdio-logs.integration.test.ts` spawns `tests/fixtures/stdio-server.ts`
+under `MCP_TRANSPORT=stdio` and `LOG_LEVEL=debug`, and checks that stdout
+carries only JSON-RPC messages while the `debug` and `info` tool lines reach
+stderr.
 
 ## Usage
 

@@ -145,9 +145,9 @@ record with a `url` and no `transport`, a completion record ending in
 `POST /users → 201 3ms` with no `req=` or `res=`, a record with `req` and no
 `res` ending in `POST /users`, a crumb with no `req=`, a `req` with no method
 kept as a field, a completion record `json` leaves unchanged, and `NO_COLOR`
-set, empty and unset. Breaking the cause walk, the trace id length, the signature order
-or its slot keys, the request tail, the banner check, the list of pino's own keys or either
-branch of the colour pick each makes a test fail.
+set, empty and unset. Breaking the cause walk, the trace id length, the
+signature order or its slot keys, the request tail, the banner check, the list
+of pino's own keys or either branch of the colour pick each makes a test fail.
 
 ## Where it is used
 

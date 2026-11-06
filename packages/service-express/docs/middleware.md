@@ -25,9 +25,9 @@ whose id was refused reads the replacement there.
 pino-http stores the id as `req.id` and runs with `quietReqLogger: true` and
 `customAttributeKeys: { reqId: TRACE_ID_FIELD }`. So `req.log` binds only
 `traceId` (the core's `TRACE_ID_FIELD`): a crumb a route writes through
-`req.log` carries `traceId` and not the whole request. The `request
-completed` line is written through a child of that logger, and carries `req`,
-`res` and `responseTime` with `traceId` once.
+`req.log` carries `traceId` and not the whole request. The `request completed`
+line is written through a child of that logger, and carries `req`, `res` and
+`responseTime` with `traceId` once.
 
 ## Tests
 
@@ -41,3 +41,6 @@ a fresh UUID the response echoes, that a crumb through `req.log` holds
 `res` and `responseTime`, with the `"traceId"` key once in its raw JSON line.
 `tests/breadcrumb.integration.test.ts` reads the same through
 `scoped(inDomain(req.log, 'Users'), 'create')`, concurrent requests included.
+`tests/terminal-lines.integration.test.ts` runs the stack under the `terminal`
+format and checks that each request draws short lines, with no `req=` or
+`res=` and one `POST /users → 201 Nms` tail.

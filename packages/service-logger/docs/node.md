@@ -97,6 +97,11 @@ the run sits in a terminal, so a test that reads stdout as JSON pins
 `format: 'json'` rather than relying on the worker's stdout; the tests in
 `src/__tests__/node.test.ts` do.
 
+`src/__tests__/node-piped.test.ts` fakes `process.stdout.isTTY` both ways. A
+piped stdout gets JSON with `traceId`, `domain` and `scope` as plain fields,
+through `createLogger` and through `createHttpLogger` alike; a TTY gets a
+decorated line, and a TTY with `LOG_FORMAT=json` gets JSON.
+
 `src/__tests__/node.test.ts` also drives `createHttpLogger` with a fake
 request and a response that emits `finish`. It checks that a valid
 `x-request-id`, 64 characters included, is kept; that one with a space, of

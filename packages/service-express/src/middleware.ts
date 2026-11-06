@@ -53,9 +53,10 @@ export function genRequestId(req: IncomingMessage, res: ServerResponse): string 
  * 5. `cookie-parser` — parses Cookie headers
  * 6. `express-rate-limit` — limits requests per window (default 100 req / 60 s)
  * 7. `pino-http` — request/response logging through the service logger; each request
- *    gets an id from {@link genRequestId}, and `req.log` binds only that id, as `traceId`
- *    (`quietReqLogger`), so a crumb carries no `req`; the `request completed` line
- *    carries `req`, `res` and `responseTime` under the same `traceId`
+ *    gets an id from {@link genRequestId}, and `req.log` binds only that id, as
+ *    `traceId` (`quietReqLogger`), so a crumb carries no `req`; the
+ *    `request completed` line carries `req`, `res` and `responseTime` under the
+ *    same `traceId`
  *
  * @param app - The Express application to configure.
  * @param config - Resolved service configuration.

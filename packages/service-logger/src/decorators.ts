@@ -337,9 +337,9 @@ export const json: Decorator = line => line;
  * then the other fields as `key=value`; a missing slot is dropped. A record
  * whose `req` has a string `method` and `url` ends in the request tail,
  * `POST /users → 201 3ms`, and its `req`, `res` and `responseTime` are not
- * drawn as fields. The serialised `err` and each link of its `cause` chain follow
- * as one `<type>: <message>` line each, and a `started` record is drawn as a
- * short block. Colour is off when `NO_COLOR` is set to a non-empty value.
+ * drawn as fields. The serialised `err` and each link of its `cause` chain
+ * follow as one `<type>: <message>` line each, and a `started` record is drawn
+ * as a short block. Colour is off when `NO_COLOR` is set to a non-empty value.
  *
  * @param line - One pino record line.
  * @returns The drawn text ending in a newline, or the line itself when it is

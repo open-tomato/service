@@ -44,8 +44,8 @@ logger.info('server listening on stdio');
 
 The browser build has the same `createLogger(name, options)` and the same
 `Logger` interface; bundlers pick it through the package's `browser` export
-condition. It has no terminal format, so `format`, `pretty`, `LOG_FORMAT` and
-`NO_COLOR` do nothing there.
+condition. It has no terminal format and no stream, so `format`, `pretty`,
+`LOG_FORMAT`, `NO_COLOR` and `destination` do nothing there.
 
 ## Terminal or JSON
 

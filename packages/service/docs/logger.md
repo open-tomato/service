@@ -59,7 +59,10 @@ or `scope` bound on it, that `inDomain` then `scoped` give `domain` and
 the domain, that a second `inDomain` replaces only the domain, that a call's
 `step` reaches only its own record and the next record carries none, and
 that the constants name the fields `traceId`, `domain`, `scope` and
-`step`. `src/index.test.ts` pins their exports.
+`step`. It checks `isTraceId` too: a UUID, a 55-character `traceparent` and a
+64-character id are admitted; an empty one, a 65-character one, one with a
+space or an escape, and a non-string are refused. `src/index.test.ts` pins
+their exports, `TRACE_ID_PATTERN` and `isTraceId` included.
 
 ## Usage
 
