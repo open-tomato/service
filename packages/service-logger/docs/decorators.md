@@ -26,7 +26,8 @@ One line per record, in this slot order:
   `key=value` field;
 - the message;
 - every other field as `key=value`. A string with a space, `=` or `"` is
-  quoted, and an object or array is written as JSON.
+  quoted, and an object or array is written as JSON;
+- the request tail, when the record has one (below).
 
 The time and the level are each followed by one space, so the level word
 lines up in a column; the slots after it are two spaces apart. A missing
@@ -36,6 +37,28 @@ pino's own keys (`time`, `level`, `pid`, `hostname`, `msg`) are not repeated
 as fields. The trace id and the three signature levels are read through the
 core's `TRACE_ID_FIELD`, `DOMAIN_FIELD`, `SCOPE_FIELD` and `STEP_FIELD`, so a
 rename in the core reaches the decorator.
+
+## The request tail
+
+A record whose `req` has a string `method` and a string `url` ends in the
+request tail, the last slot of the line after any `key=value` fields:
+`<method> <url>`, then `→ <res.statusCode>` when `res` has a numeric
+`statusCode`, then `<responseTime>ms` when the record has a numeric
+`responseTime`. The `request completed` line a request logger writes reads:
+
+```text
+12:04:31.250 INFO  orders  3f2a9c1e  request completed  POST /users → 201 3ms
+```
+
+A record with `req` and no `res` ends in `POST /users`. When the tail is
+drawn, `req`, `res` and `responseTime` are left out of the `key=value` list,
+so the line holds no `req=` or `res=`. A record whose `req` lacks a string
+`method` or `url` has no tail and draws all three as fields, as any other
+record does. A crumb logged through `req.log` carries `traceId` and no `req`,
+so it has no tail. `json` writes the record unchanged, `req` and `res`
+included.
+
+## Signature levels
 
 Each signature level is set where its value is known. The domain is bound when
 a domain's logger is made, `inDomain(logger, 'Users')`. The scope is bound at
@@ -118,9 +141,12 @@ with and without trace id and signature, the signature at all three levels,
 at two, at the domain alone and at none, none of its levels repeated as a
 field, a child of `inDomain` with a bound `scope`, an error with two nested
 causes, the banner `logStarted` writes, with and without `url`, a `started`
-record with a `url` and no `transport`, and `NO_COLOR` set, empty
-and unset. Breaking the cause walk, the trace id length, the signature order
-or its slot keys, the banner check, the list of pino's own keys or either
+record with a `url` and no `transport`, a completion record ending in
+`POST /users → 201 3ms` with no `req=` or `res=`, a record with `req` and no
+`res` ending in `POST /users`, a crumb with no `req=`, a `req` with no method
+kept as a field, a completion record `json` leaves unchanged, and `NO_COLOR`
+set, empty and unset. Breaking the cause walk, the trace id length, the signature order
+or its slot keys, the request tail, the banner check, the list of pino's own keys or either
 branch of the colour pick each makes a test fail.
 
 ## Where it is used

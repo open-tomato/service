@@ -34,6 +34,12 @@ describe('json', () => {
 
     expect(json(input)).toBe(input);
   });
+
+  it('returns a completion record unchanged, req and res included', () => {
+    const input = line({ req: { method: 'POST', url: '/users' }, res: { statusCode: 201 }, responseTime: 3, msg: 'request completed' });
+
+    expect(json(input)).toBe(input);
+  });
 });
 
 describe('terminal', () => {
@@ -209,6 +215,45 @@ describe('terminal', () => {
     const input = line({ service: 'worker', msg: 'started', url: 'http://localhost:3001', jobs: 3 });
 
     expect(terminal(input)).toBe(`${CLOCK} INFO  worker  started  url=http://localhost:3001  jobs=3\n`);
+  });
+
+  it('ends a completion record in the request tail with no req= or res= field', () => {
+    const input = line({
+      service: 'orders',
+      traceId: '3f2a9c1e5d6b4a',
+      req: { id: '3f2a9c1e5d6b4a', method: 'POST', url: '/users', headers: { host: 'localhost' } },
+      res: { statusCode: 201, headers: {} },
+      responseTime: 3,
+      msg: 'request completed',
+      userId: 42,
+    });
+
+    const drawn = terminal(input);
+
+    expect(drawn).toBe(`${CLOCK} INFO  orders  3f2a9c1e  request completed  userId=42  POST /users → 201 3ms\n`);
+    expect(drawn).not.toMatch(/\b(req|res|responseTime)=/);
+  });
+
+  it('ends a record with req and no res in the method and url', () => {
+    const input = line({ service: 'orders', req: { method: 'POST', url: '/users' }, msg: 'request received' });
+
+    expect(terminal(input)).toBe(`${CLOCK} INFO  orders  request received  POST /users\n`);
+  });
+
+  it('draws no req= for a crumb record that carries only the trace id', () => {
+    const input = line({ service: 'orders', traceId: '3f2a9c1e5d6b4a', domain: 'Users', scope: 'create', step: 'validate', msg: 'validated' });
+
+    const drawn = terminal(input);
+
+    expect(drawn).toBe(`${CLOCK} INFO  orders  3f2a9c1e  Users:create:validate  validated\n`);
+    expect(drawn).not.toContain('req=');
+  });
+
+  it('keeps req as a field when it has no method', () => {
+    const input = line({ msg: 'm', req: { url: '/users' }, res: { statusCode: 201 }, responseTime: 3 });
+
+    expect(terminal(input))
+      .toBe(`${CLOCK} INFO  m  req={"url":"/users"}  res={"statusCode":201}  responseTime=3\n`);
   });
 
   it('passes a line that is not a JSON object through', () => {
