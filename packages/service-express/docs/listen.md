@@ -13,6 +13,17 @@ does the listen.
   listens `server` on the port it picked. It answers the pick, with `port`
   read back from the bound address, so port `0` answers the port the system
   chose. `requested` and `fellBack` come from the pick unchanged.
+- `resolvePortConfig(config, env)` settles what to ask for. The port comes
+  from the config's `port` when set, else from `PORT`, else from 3000; the
+  strict flag comes from the config's `strictPort` when set, else from
+  `PORT_STRICT`, else `false`. Each is settled on its own, so a config port
+  can pair with an env strict flag. `PORT_STRICT` is strict only for `true`
+  or `1` (in any case, ignoring surrounding spaces); any other value is not
+  strict. An empty `PORT` counts as unset, and one that is not a whole
+  number throws a `RangeError` naming `PORT`. The answer carries
+  `portGiven`, `false` only when the port is the default, so a caller can
+  tell a named port from the fallback default. `env` defaults to
+  `process.env`.
 
 ## Why it re-picks once
 
@@ -47,6 +58,14 @@ drives the one re-pick; a probe that calls every port free drives the
 second `EADDRINUSE` into `PortInUseError`. Setting the attempts to one
 fails both re-pick cases, and a probe that never answers `false` fails the
 probe and fallback cases, so the checks can fail.
+
+The `resolvePortConfig` cases pass an `env` record, so they leave
+`process.env` alone, except one that sets `PORT` and `PORT_STRICT` to show
+the default and restores both. They check the defaults, the config read
+before the env, the env read when the config is silent, port and strict
+settled each on its own, a config port `0` counted as given, each strict
+and non-strict spelling of `PORT_STRICT`, and a malformed `PORT`. Reading
+the env before the config and dropping the `1` spelling fail six of them.
 
 ## Usage
 

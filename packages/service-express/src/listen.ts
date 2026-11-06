@@ -104,3 +104,67 @@ export async function listenOnPickedPort(
   }
   throw new PortInUseError({ port: lastPort, configKey: rule.configKey, cause: lastError });
 }
+
+/** The port Express listens on when neither the config nor `PORT` names one. */
+export const DEFAULT_PORT = 3000;
+
+/** The port fields of the service config that {@link resolvePortConfig} reads. */
+export interface PortConfigInput {
+  /** The configured port, read before `PORT`. */
+  readonly port?: number | undefined;
+  /** The configured strict flag, read before `PORT_STRICT`. */
+  readonly strictPort?: boolean | undefined;
+}
+
+/** The port and strict flag {@link resolvePortConfig} settled on. */
+export interface ResolvedPortConfig {
+  /** The port to ask for. */
+  readonly port: number;
+  /** Whether a taken port rejects instead of falling back. */
+  readonly strict: boolean;
+  /** `true` when the config or `PORT` named the port, `false` for the default. */
+  readonly portGiven: boolean;
+}
+
+/** The environment {@link resolvePortConfig} reads, `process.env` by default. */
+export type PortEnv = Readonly<Record<string, string | undefined>>;
+
+/** Reads `PORT` as a whole number, `undefined` when unset or empty. */
+function readPortEnv(env: PortEnv): number | undefined {
+  const raw = env.PORT?.trim();
+  if (raw === undefined || raw === '') return undefined;
+  const port = Number(raw);
+  if (!Number.isInteger(port)) {
+    throw new RangeError(`PORT must be a whole number, got "${raw}"`);
+  }
+  return port;
+}
+
+/** Reads `PORT_STRICT`: `true` only for `true` or `1`, `undefined` when unset. */
+function readStrictEnv(env: PortEnv): boolean | undefined {
+  const raw = env.PORT_STRICT;
+  if (raw === undefined) return undefined;
+  const value = raw.trim().toLowerCase();
+  return value === 'true' || value === '1';
+}
+
+/**
+ * Settles the port and the strict flag for Express: each comes from the
+ * config field when set, else from its environment variable (`PORT`,
+ * `PORT_STRICT`), else from the default (3000, `false`).
+ *
+ * @param config - The `port` and `strictPort` fields of the service config.
+ * @param env - The environment to read; defaults to `process.env`.
+ * @returns The port, the strict flag, and whether the port was given.
+ * @throws {RangeError} If `PORT` is set to something other than a whole number.
+ */
+export function resolvePortConfig(
+  config: PortConfigInput,
+  env: PortEnv = process.env,
+): ResolvedPortConfig {
+  const givenPort = config.port ?? readPortEnv(env);
+  const strict = config.strictPort ?? readStrictEnv(env) ?? false;
+  return givenPort === undefined
+    ? { port: DEFAULT_PORT, strict, portGiven: false }
+    : { port: givenPort, strict, portGiven: true };
+}
