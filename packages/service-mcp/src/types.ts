@@ -30,12 +30,37 @@ export interface MCPContext {
 }
 
 /**
- * Handle returned by `createMCP` after the server has started.
+ * Where a started MCP server can be reached, as `MCPHandle.ready()` resolves
+ * it. The ports and URLs are the bound ones, which differ from the asked
+ * ones after a fallback, and are absent in `stdio` mode.
+ */
+export interface MCPAddress {
+  /** The transport the server serves over. */
+  readonly transport: MCPTransport
+  /** The port the HTTP transport is bound to. */
+  readonly port?: number
+  /** The HTTP transport's URL, such as `http://localhost:8080`. */
+  readonly url?: string
+  /** The port the health server is bound to. */
+  readonly healthPort?: number
+  /** The health endpoint's URL, such as `http://localhost:3001/health`. */
+  readonly healthUrl?: string
+}
+
+/**
+ * Handle returned by `createMCP`, which starts the server in the background.
  *
- * Use this to gracefully shut down the server and discover the health
- * endpoint URL for readiness checks.
+ * Use this to wait for the server to listen, to gracefully shut it down, and
+ * to discover the health endpoint URL for readiness checks.
  */
 export interface MCPHandle {
+  /**
+   * Resolves once the transport, and in HTTP mode the health server, listen,
+   * with the bound ports and URLs. Rejects with the error that stopped the
+   * start, such as a `PortInUseError` under a strict port.
+   */
+  ready(): Promise<MCPAddress>
+
   /**
    * Gracefully stop the MCP server and all managed HTTP clients.
    * Resolves once all resources have been released.
@@ -44,7 +69,8 @@ export interface MCPHandle {
 
   /**
    * Returns the full URL of the health endpoint (e.g. `http://localhost:3001/health`).
-   * Not available in `stdio` mode — returns an empty string in that case.
+   * Once `ready()` resolves it names the bound health port; before that it
+   * names the asked one. Returns an empty string once started in `stdio` mode.
    */
   healthUrl(): string
 }

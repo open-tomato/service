@@ -3,17 +3,21 @@ import type { Mock } from 'vitest';
 
 import process from 'node:process';
 
+import { PortInUseError } from '@open-tomato/service';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMCP } from '../src/create-mcp.js';
+import { startHealthServer } from '../src/health.js';
+import { resolveTransport, wireHttpTransport } from '../src/transport.js';
 
 const mocks = vi.hoisted(() => {
-  const mockLogger = { info: vi.fn(), error: vi.fn() };
+  const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
   const mockTransportClose = vi.fn().mockResolvedValue(undefined);
-  const mockTransportInstance = { close: mockTransportClose };
+  const mockTransportInstance = { close: mockTransportClose, port: 8080, requested: 8080, fellBack: false };
   const mockHealthStop = vi.fn();
-  const mockHealthServerInstance = { stop: mockHealthStop };
+  const mockHealthServerInstance = { stop: mockHealthStop, port: 3001, requested: 3001, fellBack: false };
   const serverInstances: object[] = [];
+  const serverInfos: unknown[] = [];
 
   return {
     mockLogger,
@@ -22,13 +26,15 @@ const mocks = vi.hoisted(() => {
     mockHealthStop,
     mockHealthServerInstance,
     serverInstances,
+    serverInfos,
   };
 });
 
 vi.mock('@modelcontextprotocol/sdk/server/mcp.js', () => {
   class McpServer {
-    constructor() {
+    constructor(info: unknown) {
       mocks.serverInstances.push(this as object);
+      mocks.serverInfos.push(info);
     }
   }
   return { McpServer };
@@ -53,6 +59,26 @@ function tick(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
 
+type HttpHandle = Awaited<ReturnType<typeof wireHttpTransport>>;
+type HealthHandle = Awaited<ReturnType<typeof startHealthServer>>;
+
+/** Makes the next HTTP transport and health server report these picks. */
+function pickPorts(http: Partial<HttpHandle>, health: Partial<HealthHandle>): void {
+  vi.mocked(wireHttpTransport).mockResolvedValueOnce(
+    { ...mocks.mockTransportInstance, ...http } as unknown as HttpHandle,
+  );
+  vi.mocked(startHealthServer).mockResolvedValueOnce(
+    { ...mocks.mockHealthServerInstance, ...health } as unknown as HealthHandle,
+  );
+}
+
+/** The `started` records the server's logger received. */
+function startedRecords(): unknown[] {
+  return mocks.mockLogger.info.mock.calls
+    .filter(call => call[1] === 'started')
+    .map(call => call[0] as unknown);
+}
+
 describe('createMCP', () => {
   let mockSetup: Mock<MCPConfig['setup']>;
 
@@ -64,12 +90,14 @@ describe('createMCP', () => {
     process.removeAllListeners('SIGTERM');
     vi.clearAllMocks();
     mocks.serverInstances.length = 0;
+    mocks.serverInfos.length = 0;
     mocks.mockTransportClose.mockResolvedValue(undefined);
     mockSetup = vi.fn<MCPConfig['setup']>().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     process.removeAllListeners('SIGTERM');
+    vi.unstubAllEnvs();
   });
 
   // Negative tests
@@ -161,7 +189,7 @@ describe('createMCP', () => {
     expect(mocks.mockHealthStop).toHaveBeenCalled();
   });
 
-  it('healthUrl() returns the correct URL from health config', () => {
+  it('healthUrl() names the asked health port before ready', () => {
     const handle = createMCP(makeConfig({ health: { port: 3099, path: '/health' } }));
     expect(handle.healthUrl()).toBe('http://localhost:3099/health');
   });
@@ -223,16 +251,146 @@ describe('createMCP', () => {
     expect(startHealthServer).not.toHaveBeenCalled();
   });
 
-  it('calls process.exit(1) when start() throws', async () => {
+  it('calls process.exit(1) when start() throws outside NODE_ENV=test', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
     const { wireHttpTransport } = await import('../src/transport.js');
     vi.mocked(wireHttpTransport).mockRejectedValueOnce(new Error('boom'));
 
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
 
-    createMCP(makeConfig());
+    const handle = createMCP(makeConfig());
+    await expect(handle.ready()).rejects.toThrow('boom');
     await tick();
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     exitSpy.mockRestore();
+  });
+
+  it('rejects ready() with the start error and does not exit under NODE_ENV=test', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    const error = new PortInUseError({ port: 8080, configKey: 'port' });
+    vi.mocked(wireHttpTransport).mockRejectedValueOnce(error);
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+    const handle = createMCP(makeConfig());
+    await expect(handle.ready()).rejects.toBe(error);
+    await tick();
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(mocks.mockLogger.error).toHaveBeenCalledWith({ err: error }, 'Failed to start MCP server');
+    expect(startedRecords()).toEqual([]);
+    exitSpy.mockRestore();
+  });
+
+  it('leaves no rejection unhandled when ready() is never called', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandled);
+    vi.mocked(wireHttpTransport).mockRejectedValueOnce(new Error('boom'));
+
+    createMCP(makeConfig());
+    await tick();
+    await tick();
+
+    process.off('unhandledRejection', onUnhandled);
+    expect(unhandled).toEqual([]);
+  });
+
+  it('closes the transport and rejects ready() when the health server cannot listen', async () => {
+    const error = new PortInUseError({ port: 3001, configKey: 'health.port' });
+    vi.mocked(startHealthServer).mockRejectedValueOnce(error);
+
+    const handle = createMCP(makeConfig());
+
+    await expect(handle.ready()).rejects.toBe(error);
+    expect(mocks.mockTransportClose).toHaveBeenCalledOnce();
+    expect(startedRecords()).toEqual([]);
+  });
+
+  // ready(), healthUrl() and the banner
+
+  it('resolves ready() with the bound ports and URLs in HTTP mode', async () => {
+    pickPorts({ port: 8123 }, { port: 3123 });
+
+    const handle = createMCP(makeConfig({ health: { path: '/healthz' } }));
+
+    await expect(handle.ready()).resolves.toEqual({
+      transport: 'http',
+      port: 8123,
+      url: 'http://localhost:8123',
+      healthPort: 3123,
+      healthUrl: 'http://localhost:3123/healthz',
+    });
+  });
+
+  it('healthUrl() names the bound health port once ready', async () => {
+    pickPorts({}, { port: 3005, requested: 3001, fellBack: true });
+
+    const handle = createMCP(makeConfig());
+    await handle.ready();
+
+    expect(handle.healthUrl()).toBe('http://localhost:3005/health');
+  });
+
+  it('resolves ready() with the transport alone in stdio mode, with no banner', async () => {
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    const handle = createMCP(makeConfig());
+
+    await expect(handle.ready()).resolves.toEqual({ transport: 'stdio' });
+    expect(handle.healthUrl()).toBe('');
+    expect(startedRecords()).toEqual([]);
+  });
+
+  it('logs one started record with the bound URLs, version and features', async () => {
+    pickPorts({ port: 8080 }, { port: 3001 });
+
+    const handle = createMCP(makeConfig({ version: '2.1.0', features: { cache: 'redis', auth: true } }));
+    await handle.ready();
+
+    expect(startedRecords()).toEqual([{
+      service: 'test-mcp',
+      version: '2.1.0',
+      transport: 'http',
+      url: 'http://localhost:8080',
+      features: { cache: 'redis', auth: true },
+      healthUrl: 'http://localhost:3001/health',
+    }]);
+  });
+
+  it('puts fallbackPort and healthFallbackPort on the started record when both fell back', async () => {
+    pickPorts(
+      { port: 8081, requested: 8080, fellBack: true },
+      { port: 3002, requested: 3001, fellBack: true },
+    );
+
+    const handle = createMCP(makeConfig());
+    await handle.ready();
+
+    expect(startedRecords()).toEqual([expect.objectContaining({
+      url: 'http://localhost:8081',
+      fallbackPort: 8080,
+      healthUrl: 'http://localhost:3002/health',
+      healthFallbackPort: 3001,
+    })]);
+  });
+
+  it('defaults the banner version and features to unknown and {}', async () => {
+    const handle = createMCP(makeConfig());
+    await handle.ready();
+
+    expect(startedRecords()).toEqual([expect.objectContaining({ version: 'unknown', features: {} })]);
+  });
+
+  it('passes the configured version to McpServer, unknown when none is given', () => {
+    createMCP(makeConfig({ version: '3.0.0' }));
+    createMCP(makeConfig());
+
+    expect(mocks.serverInfos).toEqual([
+      { name: 'test-mcp', version: '3.0.0' },
+      { name: 'test-mcp', version: 'unknown' },
+    ]);
   });
 });

@@ -1,9 +1,12 @@
-import type { MCPConfig, MCPHandle } from './types.js';
-import type { ClientsMap, TypedClient } from '@open-tomato/service';
+import type { HealthServerHandle } from './health.js';
+import type { HttpTransportHandle } from './transport.js';
+import type { MCPAddress, MCPConfig, MCPHandle, ResolvedMCPConfig } from './types.js';
+import type { ClientsMap, Logger, TypedClient } from '@open-tomato/service';
 
 import process from 'node:process';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { logStarted } from '@open-tomato/service';
 import { createLogger } from '@open-tomato/service-logger';
 
 import { startHealthServer } from './health.js';
@@ -27,11 +30,49 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
   return Object.fromEntries(clients.map(c => [c.name, c]));
 }
 
+/** The URL of `path` on `localhost` at `port`. */
+function localUrl(port: number, path = ''): string {
+  return `http://localhost:${port}${path}`;
+}
+
+/**
+ * Writes the startup banner for HTTP mode: the bound transport URL, the
+ * bound health URL, and the asked port of each server that fell back.
+ *
+ * @param logger - The server's logger.
+ * @param config - The resolved config, for the service id, version and features.
+ * @param http - The listening HTTP transport.
+ * @param health - The listening health server.
+ */
+function logHttpStarted(
+  logger: Logger,
+  config: ResolvedMCPConfig,
+  http: HttpTransportHandle,
+  health: HealthServerHandle,
+): void {
+  logStarted(logger, {
+    service: config.serviceId,
+    version: config.version,
+    transport: 'http',
+    url: localUrl(http.port),
+    features: config.features,
+    ...(http.fellBack
+      ? { fallbackPort: http.requested }
+      : {}),
+    extra: {
+      healthUrl: localUrl(health.port, config.health.path),
+      ...(health.fellBack
+        ? { healthFallbackPort: health.requested }
+        : {}),
+    },
+  });
+}
+
 /**
  * Creates and auto-starts an MCP server from the provided configuration.
  *
  * The server starts immediately upon calling this function — no explicit
- * `start()` call is needed. It progresses through five lifecycle phases:
+ * `start()` call is needed. It progresses through six lifecycle phases:
  *
  * **1. Init** — `config` is validated and defaulted via `MCPConfigSchema`.
  * A scoped logger is created from `serviceId` and the optional `logger` config.
@@ -39,8 +80,8 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  * `name` property (set when the client was constructed via `createHttpClient`).
  *
  * **2. Setup** — `config.setup(server, ctx)` is awaited. Register all tools,
- * resources, and prompts here. If this callback throws or rejects, the factory
- * logs the error and exits the process — the health server is never started.
+ * resources, and prompts here. If this callback throws or rejects, the start
+ * fails and the health server is never started.
  *
  * **3. Transport** — the transport is selected based on the `MCP_TRANSPORT`
  * environment variable:
@@ -58,7 +99,16 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  * `"ok"` when all circuits are closed, `"degraded"` when any circuit is open or
  * half-open, `"error"` when the MCP transport itself has failed.
  *
- * **5. SIGTERM** — a one-time `SIGTERM` handler is registered _before_
+ * **5. Started** — once both servers listen in HTTP mode, `logStarted` writes
+ * the `started` banner with the bound URLs, the `version` and `features`, and
+ * `fallbackPort` and `healthFallbackPort` for a server that fell back, and
+ * `ready()` resolves with the bound address. In `stdio` mode `ready()`
+ * resolves once the transport is connected, with no banner, since stdout
+ * carries the protocol. A failed start rejects `ready()`, logs the error and,
+ * outside `NODE_ENV=test`, exits the process with code 1; a health server that
+ * cannot listen closes the transport first.
+ *
+ * **6. SIGTERM** — a one-time `SIGTERM` handler is registered _before_
  * `start()` is invoked so that signals received during the async setup phase
  * are still caught. On signal: the MCP transport is closed (draining in-flight
  * requests), then the health server is stopped. Both steps use optional
@@ -70,7 +120,7 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  * Use {@link ClientsMap} helpers or store a direct reference to avoid typos.
  *
  * @param config - MCP server configuration. See {@link MCPConfig} for details.
- * @returns An {@link MCPHandle} with `stop()` and `healthUrl()` methods.
+ * @returns An {@link MCPHandle} with `ready()`, `stop()` and `healthUrl()` methods.
  *
  * @example Minimal — no clients
  * ```ts
@@ -80,6 +130,8 @@ function buildClientsMap(clients: TypedClient<unknown>[]): ClientsMap {
  *     server.tool('greet', {}, async () => ({ content: [{ type: 'text', text: 'Hello!' }] }));
  *   },
  * });
+ *
+ * const { url, healthUrl } = await handle.ready();
  *
  * // In tests or on SIGTERM:
  * await handle.stop();
@@ -108,30 +160,22 @@ export function createMCP(config: MCPConfig): MCPHandle {
   const ports = resolvePortConfig(resolved);
   const logger = createLogger(resolved.serviceId, resolved.logger);
   const clientsMap = buildClientsMap(resolved.clients);
-  const server = new McpServer({ name: resolved.serviceId, version: '1.0.0' });
+  const server = new McpServer({ name: resolved.serviceId, version: resolved.version });
 
   let transportInstance:
     | Awaited<ReturnType<typeof wireHttpTransport>>
     | Awaited<ReturnType<typeof wireStdioTransport>>
     | null = null;
   let healthServer: Awaited<ReturnType<typeof startHealthServer>> | null = null;
+  let address: MCPAddress | null = null;
 
   /**
-   * Initialises the server: invokes `setup`, wires the transport, and starts
-   * the health server (HTTP mode only).
+   * Starts the health server beside the listening `http` transport, closing
+   * the transport when the health server cannot listen.
    */
-  async function start(): Promise<void> {
-    await resolved.setup(server, { logger, clients: clientsMap });
-
-    const transport = resolveTransport();
-
-    if (transport === 'http') {
-      transportInstance = await wireHttpTransport(server, {
-        port: ports.port,
-        strict: ports.strict,
-        logger,
-      });
-      healthServer = await startHealthServer({
+  async function startHealth(http: HttpTransportHandle): Promise<HealthServerHandle> {
+    try {
+      return await startHealthServer({
         port: ports.health.port,
         strict: ports.health.strict,
         logger,
@@ -139,9 +183,45 @@ export function createMCP(config: MCPConfig): MCPHandle {
         serviceId: resolved.serviceId,
         clients: resolved.clients,
       });
-    } else {
-      transportInstance = await wireStdioTransport(server);
+    } catch (err) {
+      transportInstance = null;
+      await http.close().catch((closeErr: unknown) => {
+        logger.error({ err: closeErr }, 'Error closing MCP transport after a failed start');
+      });
+      throw err;
     }
+  }
+
+  /**
+   * Initialises the server: invokes `setup`, wires the transport, starts the
+   * health server and writes the banner (HTTP mode only).
+   */
+  async function start(): Promise<MCPAddress> {
+    await resolved.setup(server, { logger, clients: clientsMap });
+
+    if (resolveTransport() === 'stdio') {
+      transportInstance = await wireStdioTransport(server);
+      address = { transport: 'stdio' };
+      return address;
+    }
+
+    const http = await wireHttpTransport(server, {
+      port: ports.port,
+      strict: ports.strict,
+      logger,
+    });
+    transportInstance = http;
+    const health = await startHealth(http);
+    healthServer = health;
+    address = {
+      transport: 'http',
+      port: http.port,
+      url: localUrl(http.port),
+      healthPort: health.port,
+      healthUrl: localUrl(health.port, resolved.health.path),
+    };
+    logHttpStarted(logger, resolved, http, health);
+    return address;
   }
 
   /**
@@ -166,13 +246,20 @@ export function createMCP(config: MCPConfig): MCPHandle {
     });
   });
 
-  start().catch(err => {
+  const started = start();
+  // This handler also keeps a rejection nobody awaits from going unhandled;
+  // ready() still hands the rejection to every caller.
+  started.catch((err: unknown) => {
     logger.error({ err }, 'Failed to start MCP server');
-    process.exit(1);
+    if (process.env['NODE_ENV'] !== 'test') process.exit(1);
   });
 
   return {
+    ready: () => started,
     stop: shutdown,
-    healthUrl: () => `http://localhost:${ports.health.port}${resolved.health.path}`,
+    healthUrl: () => {
+      if (address === null) return localUrl(ports.health.port, resolved.health.path);
+      return address.healthUrl ?? '';
+    },
   };
 }

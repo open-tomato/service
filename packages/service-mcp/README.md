@@ -119,7 +119,9 @@ custom setups.
 | `PORT` | `8080` | the HTTP transport's port |
 | `LOG_LEVEL` | `info` | the logger's level |
 
-`createMCP` returns `{ stop(), healthUrl() }`; `stop()` closes the
+`createMCP` returns `{ ready(), stop(), healthUrl() }`. `ready()`
+resolves with the bound ports and URLs once the servers listen, and
+rejects with the error that stopped the start; `stop()` closes the
 transport and the health server, and `SIGTERM` calls it for you.
 
 ## Requirements
