@@ -54,7 +54,8 @@ describe('stdout channel by TTY — createLogger and createHttpLogger', () => {
   });
 
   function logOnce(): void {
-    createLogger('orders').child({ traceId: TRACE_ID, scope: SCOPE }).info({ userId: 42 }, 'user created');
+    createLogger('orders').child({ traceId: TRACE_ID, scope: SCOPE })
+      .info({ userId: 42 }, 'user created');
   }
 
   function logRequest(): void {
