@@ -42,9 +42,10 @@ transport, on `port`, else `PORT`, else `8080`; it answers on any path, so
 clients can use `http://localhost:8080/mcp`. With `MCP_TRANSPORT=stdio` it
 talks over stdin and stdout instead, which is how desktop MCP clients start
 a local server. Under stdio, anything on stdout that is not protocol breaks
-the session, so there the server's logger writes to stderr, the `logger`
-that `setup` receives included; a `destination` in the `logger` config
-overrides that.
+the session, so the server's logger writes to stderr with nothing set, the
+`logger` that `setup` receives included. A `destination` in the `logger`
+config overrides that pick: `logger: { destination: 'stdout' }` puts the logs
+back on stdout, which is only safe over HTTP. See [Logging](#logging).
 
 ## Calling other services from a tool
 
@@ -126,8 +127,10 @@ with the message `started`, the startup banner:
 - `healthFallbackPort`, the health port that was asked for, present only
   after the health server fell back.
 
-In `stdio` mode the same record is written to stderr once the transport is
-connected, with `transport` `stdio` and no `url` or health fields.
+In `stdio` mode the same record is written once the transport is connected,
+with `transport` `stdio` and no `url` or health fields. It goes through the
+logger, so with nothing set it lands on stderr, and on stdout only when
+`logger: { destination: 'stdout' }` overrides the pick.
 
 `ready()` resolves with the bound address once the servers listen: the
 `transport`, and in HTTP mode the transport's `port` and `url` and the health
@@ -160,14 +163,22 @@ custom setups.
 ## Logging
 
 The logger reads `LOG_LEVEL` (default `info`). Its format is picked once:
-`LOG_FORMAT=terminal` or `LOG_FORMAT=json` picks one outright. Without it, a
-terminal on the logger's stream, stdout or under stdio stderr, gets
-readable, coloured lines, and anything else gets pino's JSON records. A pipe stays JSON on purpose: whatever takes the records
-into a logging system should get the raw records and decorate them itself,
-since pino's JSON is not readable by a person. `NODE_ENV` plays no part, so a
-server run by hand in a terminal prints readable lines whatever its
-environment. Setting `NO_COLOR` to any non-empty value turns colour off in
-the terminal format.
+`LOG_FORMAT=terminal` or `LOG_FORMAT=json` picks one outright. Without it, the
+logger looks at the stream it writes to: a terminal there gets readable,
+coloured lines, and anything else gets pino's JSON records. A pipe stays JSON
+on purpose: whatever takes the records into a logging system should get the
+raw records and decorate them itself, since pino's JSON is not readable by a
+person. `NODE_ENV` plays no part, so a server run by hand in a terminal prints
+readable lines whatever its environment. Setting `NO_COLOR` to any non-empty
+value turns colour off in the terminal format.
+
+On stdio the logs go to stderr, because stdout carries the protocol, and with
+nothing set the format follows stderr's TTY. Run by hand in a terminal, where
+stdout is a pipe and stderr is the terminal, the server prints readable lines.
+Spawned by an MCP client, stderr is a pipe, so the client gets JSON records.
+`logger: { destination: 'stdout' }` overrides the pick, and the format then
+follows stdout's TTY. Over HTTP the logs stay on stdout, so the same rule
+picks the format there.
 
 A tool handler's logger comes from `ctx.logger`, which `setup` receives. Chain
 `scoped(inDomain(logger, 'Notes'), 'search')` on it, with both helpers imported
@@ -221,7 +232,7 @@ wrote it.
 
 | Environment variable | Default | Meaning |
 |---|---|---|
-| `MCP_TRANSPORT` | HTTP | `stdio` serves over stdin and stdout |
+| `MCP_TRANSPORT` | HTTP | `stdio` serves over stdin and stdout, and its logs go to stderr; see [Logging](#logging) |
 | `PORT` | `8080` | the HTTP transport's port, read when `port` is unset |
 | `PORT_STRICT` | `false` | `true` or `1` makes a taken transport port an error, read when `strictPort` is unset |
 | `HEALTH_PORT` | `3001` | the health server's port, read when `health.port` is unset |
