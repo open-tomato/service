@@ -28,19 +28,26 @@ function captureLogger(): { logger: Logger, records: () => Record<string, unknow
 }
 
 /** An app whose route waits for a release gate, then logs through `scoped(inDomain(req.log, 'Users'), 'create')`. */
-function buildApp(logger: Logger, gate?: Promise<void>): express.Application {
+function buildApp(
+  logger: Logger,
+  gate?: Promise<void>,
+  boundFields?: Record<string, unknown>[],
+): express.Application {
   const app = express();
   applyMiddleware(app, { serviceId: SERVICE_ID } as ResolvedServiceConfig, logger);
   app.post('/users', async (req, res) => {
+    const log = scoped(inDomain(req.log as unknown as Logger, 'Users'), 'create');
+    log.debug({ step: 'validate' }, 'user validated');
     if (gate) await gate;
-    scoped(inDomain(req.log as unknown as Logger, 'Users'), 'create').info({ marker: 'create' }, 'user created');
+    log.info({ step: 'insert' }, 'user created');
+    boundFields?.push((req.log as unknown as { bindings: () => Record<string, unknown> }).bindings());
     res.status(201).json({ ok: true });
   });
   return app;
 }
 
 function createRecords(records: Record<string, unknown>[]): Record<string, unknown>[] {
-  return records.filter((r) => r['marker'] === 'create');
+  return records.filter((r) => r['domain'] === 'Users');
 }
 
 describe('Express breadcrumbs (integration)', () => {
@@ -52,9 +59,14 @@ describe('Express breadcrumbs (integration)', () => {
 
     expect(res.status).toBe(201);
     expect(res.headers[REQUEST_ID_HEADER]).toBe('trace-abc');
-    const [record, ...rest] = createRecords(records());
+    const [validate, insert, ...rest] = createRecords(records());
     expect(rest).toHaveLength(0);
-    expect(record).toMatchObject({ traceId: 'trace-abc', domain: 'Users', scope: 'create', msg: 'user created' });
+    expect(validate).toMatchObject({
+      traceId: 'trace-abc', domain: 'Users', scope: 'create', step: 'validate', level: 20, msg: 'user validated',
+    });
+    expect(insert).toMatchObject({
+      traceId: 'trace-abc', domain: 'Users', scope: 'create', step: 'insert', level: 30, msg: 'user created',
+    });
   });
 
   it('generates a new UUID traceId when the request carries no id', async () => {
@@ -64,8 +76,11 @@ describe('Express breadcrumbs (integration)', () => {
 
     const id = res.headers[REQUEST_ID_HEADER];
     expect(id).toMatch(UUID);
-    const [record] = createRecords(records());
-    expect(record).toMatchObject({ traceId: id, domain: 'Users', scope: 'create' });
+    const created = createRecords(records());
+    expect(created).toHaveLength(2);
+    for (const record of created) {
+      expect(record).toMatchObject({ traceId: id, domain: 'Users', scope: 'create' });
+    }
   });
 
   it('keeps each concurrent request on its own traceId', async () => {
@@ -74,7 +89,8 @@ describe('Express breadcrumbs (integration)', () => {
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const app = buildApp(logger, gate);
+    const bound: Record<string, unknown>[] = [];
+    const app = buildApp(logger, gate, bound);
 
     const pending = Promise.all([
       request(app).post('/users')
@@ -87,8 +103,18 @@ describe('Express breadcrumbs (integration)', () => {
 
     expect(one.headers[REQUEST_ID_HEADER]).toBe('trace-one');
     expect(two.headers[REQUEST_ID_HEADER]).toBe('trace-two');
-    const ids = createRecords(records()).map((r) => r['traceId'])
-      .sort();
-    expect(ids).toEqual(['trace-one', 'trace-two']);
+    const created = createRecords(records());
+    expect(created).toHaveLength(4);
+    for (const traceId of ['trace-one', 'trace-two']) {
+      const own = created.filter((r) => r['traceId'] === traceId);
+      expect(own.map((r) => r['step'])).toEqual(['validate', 'insert']);
+      for (const record of own) {
+        expect(record).toMatchObject({ domain: 'Users', scope: 'create' });
+      }
+    }
+    expect(bound).toHaveLength(2);
+    for (const fields of bound) {
+      expect(fields).not.toHaveProperty('step');
+    }
   });
 });
