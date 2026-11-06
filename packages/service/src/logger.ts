@@ -132,12 +132,42 @@ export const TRACE_ID_FIELD = 'traceId';
 /** The record field that names the code that wrote it, as `<Module>:<action>`. */
 export const SCOPE_FIELD = 'scope';
 
-/** The breadcrumb fields a record may carry: its trace id and its scope. */
+/** The record field that names the domain the record belongs to, such as `Users`. */
+export const DOMAIN_FIELD = 'domain';
+
+/** The record field that names the step within a scope; set per call, never bound. */
+export const STEP_FIELD = 'step';
+
+/** The breadcrumb fields a record may carry: its trace id, domain, scope and step. */
 export interface LogBreadcrumb {
   /** The trace id of the request the record belongs to. */
   [TRACE_ID_FIELD]?: string
+  /** The domain the record belongs to, in PascalCase, such as `Users`. */
+  [DOMAIN_FIELD]?: string
   /** Where the record was written, as `<Module>:<action>`. */
   [SCOPE_FIELD]?: string
+  /** The step within the scope, in camelCase, such as `insert`; passed in the call's fields. */
+  [STEP_FIELD]?: string
+}
+
+/**
+ * Returns a child logger whose records carry `domain`.
+ *
+ * A child's bindings win over its parent's, so calling it on a domain logger
+ * replaces the domain and keeps every other binding.
+ *
+ * @param logger - The logger to bind the domain on.
+ * @param domain - The domain name, in PascalCase, such as `Users`.
+ * @returns The child {@link Logger}.
+ *
+ * @example
+ * ```ts
+ * const log = inDomain(createConsoleLogger('users'), 'Users');
+ * log.info({ step: 'insert' }, 'user created'); // carries domain: 'Users', step: 'insert'
+ * ```
+ */
+export function inDomain(logger: Logger, domain: string): Logger {
+  return logger.child({ [DOMAIN_FIELD]: domain });
 }
 
 /**

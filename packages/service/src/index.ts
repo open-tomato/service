@@ -60,6 +60,14 @@ export type { BannerFeatureValue, StartupBanner } from './banner.js';
 export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
 export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
 
-export { createConsoleLogger, SCOPE_FIELD, scoped, TRACE_ID_FIELD } from './logger.js';
+export {
+  createConsoleLogger,
+  DOMAIN_FIELD,
+  inDomain,
+  SCOPE_FIELD,
+  scoped,
+  STEP_FIELD,
+  TRACE_ID_FIELD,
+} from './logger.js';
 export type { ConsoleLoggerOptions, LogBreadcrumb, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';

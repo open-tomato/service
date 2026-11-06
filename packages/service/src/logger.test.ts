@@ -2,7 +2,7 @@ import type { LogSink } from './logger.js';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createConsoleLogger, SCOPE_FIELD, scoped, TRACE_ID_FIELD } from './logger.js';
+import { createConsoleLogger, DOMAIN_FIELD, inDomain, SCOPE_FIELD, scoped, STEP_FIELD, TRACE_ID_FIELD } from './logger.js';
 
 /** A sink that records every call, one array per console method. */
 function recordingSink() {
@@ -169,5 +169,44 @@ describe('scoped', () => {
   it('names the breadcrumb fields traceId and scope', () => {
     expect(TRACE_ID_FIELD).toBe('traceId');
     expect(SCOPE_FIELD).toBe('scope');
+  });
+});
+
+describe('inDomain', () => {
+  it('does not add a domain to the logger it was given', () => {
+    const { sink, calls } = recordingSink();
+    const logger = createConsoleLogger('users', { sink });
+
+    inDomain(logger, 'Users');
+    logger.info('plain');
+
+    expect(calls.info).toEqual([['plain', { level: 'info', service: 'users' }]]);
+  });
+
+  it('writes records that carry the domain', () => {
+    const { sink, calls } = recordingSink();
+
+    inDomain(createConsoleLogger('users', { sink }), 'Users').info({ step: 'insert' }, 'user created');
+
+    expect(calls.info).toEqual([
+      ['user created', { level: 'info', service: 'users', domain: 'Users', step: 'insert' }],
+    ]);
+  });
+
+  it('replaces only the domain when called on a domain logger', () => {
+    const { sink, calls } = recordingSink();
+    const traced = createConsoleLogger('users', { sink }).child({ [TRACE_ID_FIELD]: 't-1' });
+    const outer = scoped(inDomain(traced, 'Users'), 'Users', 'create');
+
+    inDomain(outer, 'Mailer').info('mail sent');
+
+    expect(calls.info).toEqual([
+      ['mail sent', { level: 'info', service: 'users', traceId: 't-1', domain: 'Mailer', scope: 'Users:create' }],
+    ]);
+  });
+
+  it('names the domain and step fields domain and step', () => {
+    expect(DOMAIN_FIELD).toBe('domain');
+    expect(STEP_FIELD).toBe('step');
   });
 });
