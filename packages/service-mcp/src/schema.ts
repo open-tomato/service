@@ -21,7 +21,24 @@ import { z } from 'zod';
  * - `health.path` — URL path for the health check route; defaults to `'/health'`
  * - `logger` — optional `LoggerOptions` forwarded to `@open-tomato/service-logger`; sensible defaults applied when omitted
  */
-export const MCPConfigSchema = z.object({
+export const MCPConfigSchema: z.ZodObject<{
+  serviceId: z.ZodString;
+  clients: z.ZodDefault<z.ZodArray<z.ZodCustom<TypedClient<unknown>, TypedClient<unknown>>>>;
+  setup: z.ZodCustom<
+    (server: McpServer, ctx: MCPContext) => void | Promise<void>,
+    (server: McpServer, ctx: MCPContext) => void | Promise<void>
+  >;
+  port: z.ZodOptional<z.ZodNumber>;
+  strictPort: z.ZodOptional<z.ZodBoolean>;
+  version: z.ZodDefault<z.ZodString>;
+  features: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+  health: z.ZodPrefault<z.ZodObject<{
+    port: z.ZodOptional<z.ZodNumber>;
+    strictPort: z.ZodOptional<z.ZodBoolean>;
+    path: z.ZodDefault<z.ZodString>;
+  }, z.core.$strip>>;
+  logger: z.ZodOptional<z.ZodCustom<LoggerOptions, LoggerOptions>>;
+}, z.core.$strip> = z.object({
   serviceId: z.string().min(1),
   clients: z.array(z.custom<TypedClient<unknown>>()).default([]),
   setup: z.custom<(server: McpServer, ctx: MCPContext) => void | Promise<void>>(

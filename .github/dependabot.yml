@@ -21,16 +21,12 @@ updates:
     groups:
       lint-and-types:
         patterns:
-          - 'eslint*'
-          - '@eslint/*'
-          - '@stylistic/*'
+          - eslint
           - typescript
-          - typescript-eslint
-          - '@typescript-eslint/*'
           - '@types/*'
-          - globals
-          - jsonc-eslint-parser
-          - 'eslint-*'
+          # The shared configs bring the ESLint plugins and parsers.
+          - '@open-tomato/eslint-config'
+          - '@open-tomato/typescript-config'
         update-types:
           - minor
           - patch

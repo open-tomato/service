@@ -1,12 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "build: JS and declarations for the published src, checked against web-standard globals only (no Node types), so the core stays portable; tests excluded",
-  "extends": "./tsconfig.json",
+  "extends": ["./tsconfig.json", "@open-tomato/typescript-config/build"],
   "compilerOptions": {
-    "noEmit": false,
-    "declaration": true,
-    "declarationMap": false,
-    "sourceMap": false,
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2023", "WebWorker"],

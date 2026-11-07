@@ -130,7 +130,7 @@ export function createConsoleLogger(name: string, options: ConsoleLoggerOptions 
 export const TRACE_ID_FIELD = 'traceId';
 
 /** The shape a trace id must have: 1 to 64 letters, digits, `.`, `_`, `:` or `-`. */
-export const TRACE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+export const TRACE_ID_PATTERN: RegExp = /^[A-Za-z0-9._:-]{1,64}$/;
 
 /**
  * Tells whether `value` is a trace id an adapter may adopt from a request.

@@ -32,7 +32,10 @@ function dependencyRecord(field: 'dependencies' | 'clients') {
  * The control plane's settings: whether it answers at all, and the shared
  * secret a caller sends. The secret must be non-empty while it is enabled.
  */
-export const ControlConfigSchema = z.object({
+export const ControlConfigSchema: z.ZodObject<{
+  enabled: z.ZodBoolean;
+  secret: z.ZodString;
+}, z.core.$strip> = z.object({
   enabled: z.boolean(),
   secret: z.string(),
 }).refine(
@@ -60,7 +63,14 @@ export type ControlConfig = z.output<typeof ControlConfigSchema>;
  * const ServiceConfigSchema = BaseServiceConfigSchema.extend({ port: z.number().default(3000) });
  * ```
  */
-export const BaseServiceConfigSchema = z.object({
+export const BaseServiceConfigSchema: z.ZodObject<{
+  serviceId: z.ZodString;
+  version: z.ZodDefault<z.ZodString>;
+  dependencies: z.ZodDefault<z.ZodCustom<DependencyRecord, DependencyRecord>>;
+  clients: z.ZodDefault<z.ZodCustom<DependencyRecord, DependencyRecord>>;
+  control: z.ZodOptional<typeof ControlConfigSchema>;
+  stopTimeoutMs: z.ZodOptional<z.ZodNumber>;
+}, z.core.$strip> = z.object({
   serviceId: z.string().refine((value) => value.trim() !== '', { error: 'serviceId must be a non-empty string' }),
   version: z.string().min(1)
     .default('unknown'),

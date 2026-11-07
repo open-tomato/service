@@ -7,6 +7,8 @@
  */
 import type { Decorator } from './decorators.js';
 import type { Logger, LoggerOptions, LogDestination, LogFormat, LogLevel, HttpLoggerOptions } from './types.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { HttpLogger } from 'pino-http';
 
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
@@ -132,7 +134,7 @@ const DEFAULT_IGNORE_ROUTES = ['/_health', '/_control'];
  * app.use(createHttpLogger({ ignoreRoutes: ['/metrics'] }));
  * ```
  */
-export function createHttpLogger(options?: HttpLoggerOptions) {
+export function createHttpLogger(options?: HttpLoggerOptions): HttpLogger<IncomingMessage, ServerResponse<IncomingMessage>, never> {
   const envRedact = process.env['LOG_REDACT']
     ? process.env['LOG_REDACT'].split(',')
     : [];

@@ -11,7 +11,41 @@ import { z } from 'zod';
  * All fields with `.default()` are optional at call-time and will be
  * populated with the stated default when omitted.
  */
-export const ServiceConfigSchema = z.object({
+export const ServiceConfigSchema: z.ZodObject<{
+  serviceId: z.ZodString;
+  register: z.ZodCustom<
+    (app: Application, ctx: ServiceContext) => void | Promise<void>,
+    (app: Application, ctx: ServiceContext) => void | Promise<void>
+  >;
+  port: z.ZodOptional<z.ZodNumber>;
+  strictPort: z.ZodOptional<z.ZodBoolean>;
+  features: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+  auth: z.ZodOptional<z.ZodObject<{
+    introspectUrl: z.ZodString;
+    introspectSecret: z.ZodString;
+  }, z.core.$strip>>;
+  cors: z.ZodOptional<z.ZodObject<{
+    origins: z.ZodArray<z.ZodString>;
+  }, z.core.$strip>>;
+  rateLimit: z.ZodOptional<z.ZodObject<{
+    max: z.ZodNumber;
+    windowMs: z.ZodNumber;
+  }, z.core.$strip>>;
+  body: z.ZodOptional<z.ZodObject<{
+    limit: z.ZodString;
+  }, z.core.$strip>>;
+  shutdown: z.ZodOptional<z.ZodObject<{
+    drainTimeout: z.ZodNumber;
+  }, z.core.$strip>>;
+  dependencies: z.ZodDefault<z.ZodCustom<Dependency[], Dependency[]>>;
+  clients: z.ZodDefault<z.ZodCustom<Dependency[], Dependency[]>>;
+  plugins: z.ZodDefault<z.ZodCustom<
+    ServicePlugin<{ app: Application } & ServiceContext>[],
+    ServicePlugin<{ app: Application } & ServiceContext>[]
+  >>;
+  formatError: z.ZodOptional<z.ZodCustom<ErrorFormatter, ErrorFormatter>>;
+  control: z.ZodOptional<z.ZodType<ControlConfig>>;
+}, z.core.$strip> = z.object({
   /** Unique identifier for this service — used in logs and health endpoints. */
   serviceId: z.string(),
   /**
