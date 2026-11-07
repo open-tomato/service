@@ -55,6 +55,62 @@ updates:
           - minor
           - patch
 
+
+  # The 2.0 line on v2 keeps its own manifests and lockfile, so a bump
+  # merged into main conflicts when main merges into v2. This entry bumps
+  # v2 directly; v2 also depends on the shared @open-tomato configs.
+  - package-ecosystem: bun
+    directory: /
+    target-branch: v2
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
+    groups:
+      lint-and-types:
+        patterns:
+          - 'eslint*'
+          - '@eslint/*'
+          - '@stylistic/*'
+          - typescript
+          - typescript-eslint
+          - '@typescript-eslint/*'
+          - '@types/*'
+          - globals
+          - jsonc-eslint-parser
+          - 'eslint-*'
+          - '@open-tomato/*-config'
+        update-types:
+          - minor
+          - patch
+      runtime:
+        patterns:
+          - zod
+          - express
+          - 'express-*'
+          - 'pino*'
+          - helmet
+          - cors
+          - cookie-parser
+          - '@modelcontextprotocol/*'
+        update-types:
+          - minor
+          - patch
+      test:
+        patterns:
+          - vitest
+          - supertest
+        update-types:
+          - minor
+          - patch
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
