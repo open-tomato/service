@@ -3,6 +3,7 @@ import { createServer } from 'node:net';
 import { Client } from '@modelcontextprotocol/sdk/client';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createConsoleLogger } from '@open-tomato/service';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { wireHttpTransport } from '../src/transport.js';
@@ -39,7 +40,10 @@ describe('wireHttpTransport under Node', () => {
       content: [{ type: 'text', text: 'pong' }],
     }));
 
-    const handle = await wireHttpTransport(server, PORT);
+    const logger = createConsoleLogger('node-transport', { level: 'silent' });
+    const handle = await wireHttpTransport(server, { port: PORT, strict: true, logger });
+    expect(handle.port).toBe(PORT);
+    expect(handle.fellBack).toBe(false);
     const client = new Client({ name: 'node-transport-test', version: '1.0.0' });
     await client.connect(new StreamableHTTPClientTransport(new URL(`http://localhost:${PORT}/mcp`)));
 

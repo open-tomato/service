@@ -1,4 +1,4 @@
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 
 import express from 'express';
 import request from 'supertest';
@@ -8,7 +8,7 @@ import { buildOptionalAuth, buildRequireAuth, createIntrospectVerifier, getSessi
 
 const INTROSPECT_URL = 'http://auth.test/introspect';
 const SECRET = 'chassis-shared-secret';
-const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() } as unknown as ServiceLogger;
+const logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() } as unknown as Logger;
 
 /** Fake an introspect HTTP response. */
 function mockIntrospect(body: unknown, ok = true): void {

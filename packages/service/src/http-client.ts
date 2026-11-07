@@ -4,6 +4,22 @@ import { CircuitBreaker } from './circuit-breaker.js';
 import { withRetry } from './retry.js';
 
 /**
+ * The client name from `opts`, checked at run time as well: a JavaScript
+ * caller, or one moving from 1.x where the options were optional, can pass
+ * none, and an unnamed client would be indistinguishable in health reports.
+ *
+ * @throws {TypeError} When `opts` or `opts.name` is missing, or the name is
+ *   blank.
+ */
+function requireName(opts: HttpClientOpts | undefined): string {
+  const name: unknown = opts?.name;
+  if (typeof name !== 'string' || name.trim() === '') {
+    throw new TypeError('createHttpClient: opts.name must be a non-empty string');
+  }
+  return name;
+}
+
+/**
  * Wraps an HTTP client (or any SDK instance) of type `T` in a `Proxy` that
  * transparently applies retry logic and circuit-breaker protection to every
  * method call, and exposes the standard {@link Dependency} lifecycle surface
@@ -42,13 +58,16 @@ import { withRetry } from './retry.js';
  *   methods are being proxied. Must be an object type.
  *
  * @param client - The underlying client instance to wrap.
- * @param opts - Optional retry and circuit-breaker configuration.
+ * @param opts - The client's name, plus optional retry and circuit-breaker
+ *   configuration.
  * @returns A `Proxy`-wrapped `TypedClient<T>` combining the client's own
  *   method surface with the {@link Dependency} lifecycle interface.
+ * @throws {TypeError} When `opts.name` is missing or blank.
  *
  * @example
  * ```ts
  * const apiClient = createHttpClient(new MyApiSdk(), {
+ *   name: 'my-api',
  *   retry: { attempts: 5, backoff: 'exponential', jitter: true },
  *   circuitBreaker: { threshold: 3, timeout: 10_000 },
  * });
@@ -65,9 +84,10 @@ import { withRetry } from './retry.js';
  */
 export function createHttpClient<T extends object>(
   client: T,
-  opts?: HttpClientOpts,
+  opts: HttpClientOpts,
 ): TypedClient<T> {
-  const breaker = new CircuitBreaker(opts?.circuitBreaker);
+  const name = requireName(opts);
+  const breaker = new CircuitBreaker(opts.circuitBreaker);
   let stopped = false;
 
   /**
@@ -77,7 +97,7 @@ export function createHttpClient<T extends object>(
    * client has been explicitly stopped via `stop()`.
    */
   const dependency: Dependency = {
-    name: 'http-client',
+    name,
 
     get status(): DependencyStatus {
       if (stopped) return 'stopped';

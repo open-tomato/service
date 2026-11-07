@@ -22,7 +22,8 @@ import pino from 'pino/browser';
  *
  * @param name - Service identifier attached to every log entry as `service`.
  * @param options - Optional configuration overrides (level, context).
- *   The `pretty` option is not applicable in the browser entry.
+ *   The `pretty` and `destination` options are not applicable in the browser
+ *   entry.
  * @returns A {@link Logger} instance configured for browser output.
  *
  * @example

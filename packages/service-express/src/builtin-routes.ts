@@ -1,6 +1,6 @@
 import type { ResolvedServiceConfig } from './schema.js';
 import type { ServiceContext } from './types.js';
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 import type { Application } from 'express';
 
 import { createControlRouter } from './control/routes.js';
@@ -21,7 +21,7 @@ export function mountBuiltinRoutes(
   app: Application,
   config: ResolvedServiceConfig,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _logger: ServiceLogger,
+  _logger: Logger,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _ctx: ServiceContext,
 ): void {

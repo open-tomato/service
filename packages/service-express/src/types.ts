@@ -5,13 +5,17 @@ import type { Application, RequestHandler } from 'express';
 /**
  * The handle returned by `createService`.
  *
- * Holds a reference to the underlying Express application and a `stop()`
- * method that gracefully shuts down the HTTP server and all registered
+ * Holds a reference to the underlying Express application, the port and URL
+ * the server is bound to, and a `stop()` method that gracefully shuts down the HTTP server and all registered
  * dependencies in reverse-start order.
  */
 export interface ServiceHandle {
   /** The underlying Express application instance. */
   app: Application
+  /** The port the server is bound to, which differs from the asked one after a fallback or for port 0. */
+  port: number
+  /** The URL the server listens on, `http://localhost:<port>`. */
+  url: string
   /**
    * Gracefully stop the service: close the HTTP server, drain in-flight
    * requests, and stop all dependencies in reverse-start order.
@@ -55,7 +59,7 @@ export interface ServiceContext {
  *
  * @example
  * ```ts
- * const api = createHttpClient(new MyApiSdk(), { retry: { attempts: 3 } })
+ * const api = createHttpClient(new MyApiSdk(), { name: 'my-api', retry: { attempts: 3 } })
  *
  * await createService({
  *   clients: [api],

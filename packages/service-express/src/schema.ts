@@ -1,6 +1,6 @@
 import type { ControlConfig } from './control/types.js';
 import type { ServiceContext } from './types.js';
-import type { Dependency, ServicePlugin } from '@open-tomato/service';
+import type { Dependency, ErrorFormatter, ServicePlugin } from '@open-tomato/service';
 import type { Application } from 'express';
 
 import { z } from 'zod';
@@ -11,7 +11,41 @@ import { z } from 'zod';
  * All fields with `.default()` are optional at call-time and will be
  * populated with the stated default when omitted.
  */
-export const ServiceConfigSchema = z.object({
+export const ServiceConfigSchema: z.ZodObject<{
+  serviceId: z.ZodString;
+  register: z.ZodCustom<
+    (app: Application, ctx: ServiceContext) => void | Promise<void>,
+    (app: Application, ctx: ServiceContext) => void | Promise<void>
+  >;
+  port: z.ZodOptional<z.ZodNumber>;
+  strictPort: z.ZodOptional<z.ZodBoolean>;
+  features: z.ZodDefault<z.ZodRecord<z.ZodString, z.ZodUnion<readonly [z.ZodString, z.ZodNumber, z.ZodBoolean]>>>;
+  auth: z.ZodOptional<z.ZodObject<{
+    introspectUrl: z.ZodString;
+    introspectSecret: z.ZodString;
+  }, z.core.$strip>>;
+  cors: z.ZodOptional<z.ZodObject<{
+    origins: z.ZodArray<z.ZodString>;
+  }, z.core.$strip>>;
+  rateLimit: z.ZodOptional<z.ZodObject<{
+    max: z.ZodNumber;
+    windowMs: z.ZodNumber;
+  }, z.core.$strip>>;
+  body: z.ZodOptional<z.ZodObject<{
+    limit: z.ZodString;
+  }, z.core.$strip>>;
+  shutdown: z.ZodOptional<z.ZodObject<{
+    drainTimeout: z.ZodNumber;
+  }, z.core.$strip>>;
+  dependencies: z.ZodDefault<z.ZodCustom<Dependency[], Dependency[]>>;
+  clients: z.ZodDefault<z.ZodCustom<Dependency[], Dependency[]>>;
+  plugins: z.ZodDefault<z.ZodCustom<
+    ServicePlugin<{ app: Application } & ServiceContext>[],
+    ServicePlugin<{ app: Application } & ServiceContext>[]
+  >>;
+  formatError: z.ZodOptional<z.ZodCustom<ErrorFormatter, ErrorFormatter>>;
+  control: z.ZodOptional<z.ZodType<ControlConfig>>;
+}, z.core.$strip> = z.object({
   /** Unique identifier for this service — used in logs and health endpoints. */
   serviceId: z.string(),
   /**
@@ -21,8 +55,23 @@ export const ServiceConfigSchema = z.object({
    */
   register: z.custom<(app: Application, ctx: ServiceContext) => void | Promise<void>>(),
 
-  /** TCP port the HTTP server listens on. @default 3000 */
-  port: z.number().default(3000),
+  /**
+   * TCP port the HTTP server listens on. When omitted, the `PORT`
+   * environment variable is read, then 3000; see `resolvePortConfig`.
+   */
+  port: z.number().optional(),
+  /**
+   * When `true`, a taken port rejects with `PortInUseError` instead of
+   * falling back to a later port. When omitted, the `PORT_STRICT`
+   * environment variable is read, then `false`; see `resolvePortConfig`.
+   */
+  strictPort: z.boolean().optional(),
+  /**
+   * Feature flags or settings reported in the startup banner, as a record
+   * of string, number or boolean values.
+   * @default {}
+   */
+  features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default(() => ({})),
   /**
    * Session introspection configuration.
    * When provided, `requireAuth` and `optionalAuth` validate sessions against
@@ -90,6 +139,14 @@ export const ServiceConfigSchema = z.object({
    * @default []
    */
   plugins: z.custom<ServicePlugin<{ app: Application } & ServiceContext>[]>().default(() => []),
+  /**
+   * Turns anything a route throws into the status and body the error
+   * handler answers with. When omitted, the core's `toErrorResponse` is
+   * used, which answers `{ code, message, details? }`.
+   */
+  formatError: z.custom<ErrorFormatter>((value) => typeof value === 'function', {
+    error: 'formatError must be a function',
+  }).optional(),
   /**
    * Operator control-plane configuration.
    * When enabled, mounts `/_control/*` routes protected by `secret`.

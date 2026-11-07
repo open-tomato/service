@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { Logger, LoggerOptions, ClientsMap, TypedClient } from '@open-tomato/service';
+import type { Logger, ClientsMap, TypedClient } from '@open-tomato/service';
+import type { LoggerOptions } from '@open-tomato/service-logger';
 
 export type { ClientsMap };
 
@@ -29,12 +30,37 @@ export interface MCPContext {
 }
 
 /**
- * Handle returned by `createMCP` after the server has started.
+ * Where a started MCP server can be reached, as `MCPHandle.ready()` resolves
+ * it. The ports and URLs are the bound ones, which differ from the asked
+ * ones after a fallback, and are absent in `stdio` mode.
+ */
+export interface MCPAddress {
+  /** The transport the server serves over. */
+  readonly transport: MCPTransport
+  /** The port the HTTP transport is bound to. */
+  readonly port?: number
+  /** The HTTP transport's URL, such as `http://localhost:8080`. */
+  readonly url?: string
+  /** The port the health server is bound to. */
+  readonly healthPort?: number
+  /** The health endpoint's URL, such as `http://localhost:3001/health`. */
+  readonly healthUrl?: string
+}
+
+/**
+ * Handle returned by `createMCP`, which starts the server in the background.
  *
- * Use this to gracefully shut down the server and discover the health
- * endpoint URL for readiness checks.
+ * Use this to wait for the server to listen, to gracefully shut it down, and
+ * to discover the health endpoint URL for readiness checks.
  */
 export interface MCPHandle {
+  /**
+   * Resolves once the transport, and in HTTP mode the health server, listen,
+   * with the bound ports and URLs. Rejects with the error that stopped the
+   * start, such as a `PortInUseError` under a strict port.
+   */
+  ready(): Promise<MCPAddress>
+
   /**
    * Gracefully stop the MCP server and all managed HTTP clients.
    * Resolves once all resources have been released.
@@ -43,7 +69,8 @@ export interface MCPHandle {
 
   /**
    * Returns the full URL of the health endpoint (e.g. `http://localhost:3001/health`).
-   * Not available in `stdio` mode — returns an empty string in that case.
+   * Once `ready()` resolves it names the bound health port; before that it
+   * names the asked one. Returns an empty string once started in `stdio` mode.
    */
   healthUrl(): string
 }
@@ -58,10 +85,17 @@ export interface MCPHandle {
  */
 export interface HealthConfig {
   /**
-   * Port on which the health server listens.
-   * @default 3001
+   * Port on which the health server listens. When omitted, the
+   * `HEALTH_PORT` environment variable is read, then `3001`.
    */
   port?: number
+  /**
+   * When `true`, a taken health port rejects with `PortInUseError` instead
+   * of falling back to a later port. When omitted, the
+   * `HEALTH_PORT_STRICT` environment variable is read (`true` or `1`), then
+   * `false`.
+   */
+  strictPort?: boolean
   /**
    * URL path for the health check route.
    * @default '/health'
@@ -105,6 +139,35 @@ export interface MCPConfig {
   setup: (server: McpServer, ctx: MCPContext) => void | Promise<void>
 
   /**
+   * Port for the HTTP transport. When omitted, the `PORT` environment
+   * variable is read, then `8080`. Not used in `stdio` transport mode.
+   */
+  port?: number
+
+  /**
+   * When `true`, a taken transport port rejects with `PortInUseError`
+   * instead of falling back to a later port. When omitted, the
+   * `PORT_STRICT` environment variable is read (`true` or `1`), then
+   * `false`.
+   */
+  strictPort?: boolean
+
+  /**
+   * Version of the MCP server, passed to `McpServer` and shown in the
+   * startup banner.
+   *
+   * @default 'unknown'
+   */
+  version?: string
+
+  /**
+   * Feature flags or settings shown in the startup banner.
+   *
+   * @default {}
+   */
+  features?: Record<string, string | number | boolean>
+
+  /**
    * Configuration for the standalone HTTP health endpoint.
    * Not used in `stdio` transport mode.
    */
@@ -132,10 +195,20 @@ export interface ResolvedMCPConfig {
   clients: TypedClient<unknown>[]
   /** @see MCPConfig.setup */
   setup: (server: McpServer, ctx: MCPContext) => void | Promise<void>
-  /** Health endpoint configuration with all defaults applied. */
+  /** @see MCPConfig.port — left unset so `resolvePortConfig` can read `PORT`. */
+  port?: number
+  /** @see MCPConfig.strictPort — left unset so `resolvePortConfig` can read `PORT_STRICT`. */
+  strictPort?: boolean
+  /** @see MCPConfig.version */
+  version: string
+  /** @see MCPConfig.features */
+  features: Record<string, string | number | boolean>
+  /** Health endpoint configuration with the path default applied. */
   health: {
-    /** @default 3001 */
-    port: number
+    /** @see HealthConfig.port — left unset so `resolvePortConfig` can read `HEALTH_PORT`. */
+    port?: number
+    /** @see HealthConfig.strictPort — left unset so `resolvePortConfig` can read `HEALTH_PORT_STRICT`. */
+    strictPort?: boolean
     /** @default '/health' */
     path: string
   }

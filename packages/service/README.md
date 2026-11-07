@@ -13,8 +13,9 @@ stack. It gives a TypeScript service the parts every service needs:
 - **Typed HTTP clients.** Wrap any client object, and every method call on it
   retries with backoff and goes through a circuit breaker, with the client's
   own types kept.
-- **One shape for all of them**, so an adapter can start them in order, stop
-  them in reverse and report their health.
+- **A runtime** that starts them in order, undoes a start that fails part
+  way, stops them in reverse and reports their health, the same way under
+  every adapter.
 
 Use it through an adapter: [`@open-tomato/service-express`](https://www.npmjs.com/package/@open-tomato/service-express)
 for an HTTP service, or [`@open-tomato/service-mcp`](https://www.npmjs.com/package/@open-tomato/service-mcp)
@@ -80,6 +81,7 @@ class InventoryApi {
 }
 
 const inventory = createHttpClient(new InventoryApi(), {
+  name: 'inventory',
   retry: { attempts: 3, backoff: 'exponential', jitter: true },
   circuitBreaker: { threshold: 5, timeout: 30_000 },
 });
@@ -97,20 +99,299 @@ try {
 
 | Option | Default | Meaning |
 |---|---|---|
+| `name` | required | the client's name, shown in health reports and logs; non-empty |
 | `retry.attempts` | `3` | calls in total, the first one included |
 | `retry.backoff` | `'exponential'` | `'exponential'` doubles the wait, `'linear'` keeps it constant |
 | `retry.jitter` | `false` | adds a random part to each wait |
 | `circuitBreaker.threshold` | `5` | consecutive failures that open the breaker |
 | `circuitBreaker.timeout` | `30000` | milliseconds before an open breaker lets a probe through |
 
+## A runtime
+
+`createRuntime` takes a service's dependencies and clients as named
+records and starts and stops them as one. Each comes back under its key,
+with its own type.
+
+```ts
+import { createDependency, createHttpClient, createRuntime } from '@open-tomato/service';
+
+class InventoryApi {
+  async stock(sku: string): Promise<number> { return sku.length; }
+}
+
+const runtime = createRuntime({
+  serviceId: 'orders',
+  dependencies: {
+    cache: createDependency({ name: 'cache', client: new Map<string, string>() }),
+  },
+  clients: {
+    inventory: createHttpClient(new InventoryApi(), { name: 'inventory' }),
+  },
+});
+
+await runtime.ensureStarted();
+runtime.deps.cache.client.set('greeting', 'hello'); // typed as Map<string, string>
+await runtime.clients.inventory.stock('sku-42');
+console.log(runtime.health()); // { status: 'ok', dependencies: { cache: 'running', inventory: 'running' } }
+
+console.log(await runtime.stop()); // { stopped: ['inventory', 'cache'], failed: [], timedOut: [] }
+```
+
+- **Order.** Dependencies start in key order, then clients; `stop()`
+  stops them in reverse.
+- **One start.** `ensureStarted()` starts once: calls made during a start
+  share it, and a call once running resolves at once. If a dependency
+  fails, the ones already started are stopped in reverse, the call rejects
+  with that error, and the next call tries again.
+- **A stop that always finishes.** `stop()` never rejects. Each
+  dependency gets `stopTimeoutMs` (10 000 by default); one that fails or
+  outlasts it is reported, and the rest still stop.
+- **Names.** Health reports and logs use each dependency's own `name`,
+  which must be unique across dependencies and clients; `createRuntime`
+  throws a `TypeError` otherwise.
+
+## Health
+
+`aggregateHealth` folds the statuses of a service's dependencies and
+clients into one report, the rule every adapter's health route answers
+with. Anything with a `name` and a `status` fits, so dependencies and
+clients go in as they are. `HEALTH_HTTP_STATUS` maps the overall status to
+200 or 503.
+
+```ts
+import { aggregateHealth, HEALTH_HTTP_STATUS } from '@open-tomato/service';
+
+const report = aggregateHealth([
+  { name: 'db', status: 'running' },
+  { name: 'inventory', status: 'degraded' },
+], { started: true });
+// { status: 'degraded', dependencies: { db: 'running', inventory: 'degraded' } }
+
+console.log(HEALTH_HTTP_STATUS[report.status]); // 200
+```
+
+The overall status is the worst one any dependency gives:
+
+| Dependency status | Before start | After start |
+|---|---|---|
+| `running` | `ok` (200) | `ok` (200) |
+| `starting`, `degraded`, `paused` | `degraded` (200) | `degraded` (200) |
+| `stopped`, `stopping` | `degraded` (200) | `error` (503) |
+| `error` | `error` (503) | `error` (503) |
+
+Before start, a stopped dependency counts as degraded, so a service that
+starts on its first request still answers 200 to the probe that lets that
+request through.
+
+## Control
+
+The control operations are plain functions over a runtime. Each returns a
+`{ status, body }` pair, so an adapter only maps it onto its transport.
+
+```ts
+import { controlStatus, createRuntime, verifyControlToken } from '@open-tomato/service';
+
+const secret = 'configured-secret';
+const sent = 'configured-secret'; // the x-control-token header, in an adapter
+const runtime = createRuntime({ serviceId: 'orders' });
+const startedAt = Date.now();
+await runtime.ensureStarted();
+
+if (await verifyControlToken(sent, secret)) {
+  const { status, body } = controlStatus(runtime, { version: '2.0.0', startedAt });
+  console.log(status, body.status); // 200 'ok'
+}
+```
+
+- `controlStatus(runtime, { version, startedAt })`: the overall health,
+  uptime, version, and each dependency and client. Always 200.
+- `listDependencies(runtime)`: each dependency's name, status and health
+  detail.
+- `pauseDependency`, `resumeDependency`, `restartDependency` and
+  `resetClient`, each `(runtime, name)`: 200 `{ ok: true }`, 400
+  `BAD_REQUEST` for an empty name or a missing `pause`/`resume`, 404
+  `NOT_FOUND` for an unknown name, and 500 `INTERNAL_ERROR` with the
+  dependency's message when it throws. Each failure body is an error body,
+  as in [Errors](#errors).
+- `verifyControlToken(given, expected)`: compares a token in constant
+  time through WebCrypto. A non-string token or an empty secret is
+  rejected.
+
+## Config
+
+`BaseServiceConfigSchema` is the config every adapter shares, written with
+[zod](https://zod.dev). An adapter, or a service, adds its own fields with
+`.extend()`, so the shared fields are checked the same way everywhere.
+
+```ts
+import { z } from 'zod';
+
+import { BaseServiceConfigSchema, createDependency } from '@open-tomato/service';
+
+const ServiceConfigSchema = BaseServiceConfigSchema.extend({
+  port: z.number().default(3000),
+});
+
+const config = ServiceConfigSchema.parse({
+  serviceId: 'orders',
+  dependencies: { cache: createDependency({ name: 'cache' }) },
+});
+console.log(config.port, config.version); // 3000 'unknown'
+```
+
+| Field | Default | Meaning |
+|---|---|---|
+| `serviceId` | required | the service's name; non-blank |
+| `version` | `'unknown'` | the version `controlStatus` reports |
+| `dependencies`, `clients` | `{}` | records of `Dependency` objects by key, as `createRuntime` takes them; a 1.x array is rejected |
+| `control` | none | `{ enabled, secret }`; the secret must be non-empty while `enabled` is true |
+| `stopTimeoutMs` | none, so `createRuntime` uses 10 000 | milliseconds each dependency gets to stop; 0 or more |
+
+zod is the core's one dependency. It has no Node-only code, so the core
+still runs on the web-standard globals alone.
+
+## Errors
+
+Every error response in the stack has one body: a machine-readable `code`,
+a `message`, and `details` when the error has some.
+
+```json
+{ "code": "NOT_FOUND", "message": "order not found", "details": { "orderId": "o-1" } }
+```
+
+Throw one of the error classes and the adapter answers with its status and
+body. `toErrorResponse` is the rule the adapters apply to anything thrown,
+and it uses what the error carries before falling back:
+
+```ts
+import { NotFoundError, toErrorResponse } from '@open-tomato/service';
+
+console.log(toErrorResponse(new NotFoundError('order not found', { orderId: 'o-1' })));
+// { status: 404, body: { code: 'NOT_FOUND', message: 'order not found', details: { orderId: 'o-1' } } }
+
+console.log(toErrorResponse(new Error('db at db-primary.internal refused')));
+// { status: 500, body: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } }
+```
+
+| Thrown | Status | Body |
+|---|---|---|
+| an `AppError` | its `statusCode` | its `toJSON()` |
+| a `ZodError` | 422 | `VALIDATION_ERROR`, one field error per issue in `details` |
+| a `CircuitOpenError` | 503 | `SERVICE_UNAVAILABLE` |
+| an error with a 4xx `status` or `statusCode` | that status | its own `code`, `message` and `details`, or the status's code and message where it has none |
+| an error with a 5xx status | that status | the status's generic code and message |
+| anything else | 500 | `INTERNAL_ERROR`, a generic message |
+
+A server error never sends the error's own message, code or details, which
+can carry internal context, so the handler logs the error for those. To
+change what callers see, give the adapter your own `ErrorFormatter`, a
+function from the thrown value to `{ status, body }`.
+
+On the calling side, `parseApiError(response)` reads a failed `Response`
+into `{ code, message, details?, statusCode }`. It also reads a 1.x
+`{ error }` body, and a body that is not JSON, by taking the code from the
+status.
+
+| Class | Status | Code |
+|---|---|---|
+| `BadRequestError` | 400 | `BAD_REQUEST` |
+| `UnauthorizedError` | 401 | `UNAUTHORIZED` |
+| `ForbiddenError` | 403 | `FORBIDDEN` |
+| `NotFoundError` | 404 | `NOT_FOUND` |
+| `ConflictError` | 409 | `CONFLICT` |
+| `ValidationError` | 422 | `VALIDATION_ERROR` |
+| `InternalError` | 500 | `INTERNAL_ERROR`; its details are dropped when `NODE_ENV` is `production` |
+| `AppError` | any | any, for a code of your own |
+
+## Logging
+
+The core writes through a `Logger`: the part of pino's API the stack uses.
+A pino logger fits it, and so does one from
+[`@open-tomato/service-logger`](https://www.npmjs.com/package/@open-tomato/service-logger),
+which is what the adapters create. For code that runs without an
+adapter, `createConsoleLogger` needs no dependency and runs anywhere a
+`console` exists.
+
+```ts
+import { createConsoleLogger } from '@open-tomato/service';
+
+const logger = createConsoleLogger('orders', { level: 'debug' });
+
+logger.info({ orderId: 'o-1' }, 'order created');
+// console.info('order created', { level: 'info', service: 'orders', orderId: 'o-1' })
+
+logger.child({ requestId: 'r-9' }).warn('slow upstream');
+```
+
+The level comes from `options.level`, then `LOG_LEVEL`, then `info`. An
+`Error` passed as the first argument lands under `err`, so its message and
+stack survive.
+
+### Breadcrumbs
+
+A record can say where it was written. `inDomain` binds the domain once,
+when a domain's logger is made; `scoped` binds the scope at the entry point
+of a file's workflow; each call passes its step in the context object.
+The record then names the exact place a step was called from.
+
+```ts
+import { createConsoleLogger, inDomain, scoped } from '@open-tomato/service';
+
+const users = inDomain(createConsoleLogger('users'), 'Users');
+
+function create(userId: string): void {
+  const log = scoped(users, 'create');
+  log.debug({ step: 'validate', userId }, 'checking the user');
+  log.info({ step: 'insert', userId }, 'user created');
+  // carries domain: 'Users', scope: 'create', step: 'insert'
+}
+
+create('42');
+```
+
+- **Case.** The domain is PascalCase, such as `Users`; the scope and the
+  step are camelCase, such as `create` and `insert`.
+- **The step is never bound.** It goes in the call's context object. A step
+  bound on a child would stick to every record that logger writes after it.
+- **Levels.** `trace` and `debug` suit the routine steps of a flow, so most
+  steps get one of those; `info` marks only the key steps on the use case's
+  critical path; `warn` and `error` mark a step that failed.
+- **Why not `<Module>:<action>`.** Keeping the scope as one `Module:action`
+  string and adding a step would bind two levels at one moment, while the
+  domain is known earlier than the entry point.
+
+The field names are constants, `DOMAIN_FIELD`, `SCOPE_FIELD`, `STEP_FIELD`
+and `TRACE_ID_FIELD`, and `LogBreadcrumb` types the four fields a record may
+carry. Read a record's fields through them, never as string literals.
+
 ## Exports
 
 | Export | What it is |
 |---|---|
 | `createDependency(opts)` | a `Dependency`, or a `TypedDependency<T>` when `opts.client` is given |
-| `createHttpClient(client, opts?)` | the client with retry and a circuit breaker, plus the `Dependency` lifecycle |
-| `CircuitOpenError` | thrown by a client call while its breaker is open |
-| `createServiceLogger(serviceId, options?)` | a pino logger bound to `serviceId`, from [`@open-tomato/service-logger`](https://www.npmjs.com/package/@open-tomato/service-logger) |
+| `createHttpClient(client, opts)` | the client with retry and a circuit breaker, plus the `Dependency` lifecycle; `opts.name` is required |
+| `withRetry(fn, config?)` | runs `fn` with the same retry policy, for a call that is not a client method |
+| `CircuitBreaker`, `CircuitState` | the breaker a client uses, for wrapping any async call; its state is `'closed'`, `'open'` or `'half-open'` |
+| `CircuitOpenError` | thrown by a breaker's call while it is open |
+| `createRuntime(options)` | the runtime that starts, stops and reports on a service's dependencies and clients |
+| `Runtime`, `RuntimeOptions`, `RuntimeState`, `StopResult`, `DependencyRecord` | the runtime's types |
+| `controlStatus`, `listDependencies`, `pauseDependency`, `resumeDependency`, `restartDependency`, `resetClient` | the control operations, each returning `{ status, body }` |
+| `verifyControlToken(given, expected)` | the control token check, constant time, on WebCrypto |
+| `ControlResult`, `ControlActionBody`, `ControlStatusBody`, `ControlStatusOptions`, `ControlTarget`, `DependencyControlStatus`, `ClientControlStatus` | the control operations' types |
+| `aggregateHealth(dependencies, options)`, `HEALTH_HTTP_STATUS` | the one health rule, and its HTTP status per overall status |
+| `HealthReport`, `HealthStatus`, `AggregateHealthOptions` | the health report's types |
+| `AppError`, `BadRequestError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`, `ValidationError`, `InternalError` | the error classes, each with its status and code |
+| `toErrorResponse(error)`, `zodToValidationError(err)` | the default rule from anything thrown to `{ status, body }`, and a `ZodError` as a `ValidationError` |
+| `isErrorBody(value)`, `parseApiError(response)` | the calling side: whether a value is an error body, and a failed `Response` read into one |
+| `ErrorBody`, `FieldError`, `ErrorResponse`, `ErrorFormatter`, `ApiError` | the error types |
+| `BaseServiceConfigSchema`, `ControlConfigSchema` | the zod schemas for the shared config and its `control` field |
+| `BaseServiceConfig`, `ResolvedBaseServiceConfig`, `ControlConfig` | the config as written, the config once parsed, and the `control` field |
+| `createConsoleLogger(name, options?)` | a `Logger` that writes through `console`, with no dependency |
+| `inDomain(logger, domain)` | a child logger whose records carry `domain`, in PascalCase, such as `Users` |
+| `scoped(logger, scope)` | a child logger whose records carry `scope`, in camelCase, such as `create` |
+| `TRACE_ID_FIELD`, `DOMAIN_FIELD`, `SCOPE_FIELD`, `STEP_FIELD` | the record field names the breadcrumb uses; read them, never the literal strings |
+| `LogBreadcrumb` | the breadcrumb fields a record may carry: trace id, domain, scope and step |
+| `Logger`, `LogLevel`, `LogSink`, `ConsoleLoggerOptions` | the logger contract the stack writes through |
 | `Dependency`, `TypedDependency<T>`, `DependencyStatus`, `DepsMap`, `TypedClient<T>`, `ServicePlugin` | the shared types the adapters use |
 
 ## Requirements
