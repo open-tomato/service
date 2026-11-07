@@ -25,8 +25,11 @@ Each public package versions on its own and publishes to npmjs under the
 2. **Settle.** `rafa release settle` folds the fragments waiting on
    `main` into each package's version and `CHANGELOG.md`, in one release
    commit.
-3. **Tag.** `rafa release tag --push` tags each settled package as
-   `<name>@<version>` and pushes the tags.
+3. **Tag.** `git pull --ff-only`, then `rafa release tag --push`, which
+   tags each settled package as `<name>@<version>` and pushes the tags.
+   Settle pushes its release commit without moving the local branch, and
+   tag reads each version from the local checkout, so before the pull it
+   finds every version already tagged and writes nothing.
 4. **Publish.** A pushed tag starts `.github/workflows/release-publish.yml`,
    which runs the gates and `rafa release publish`. That runs
    `scripts/publish-package.ts` in each tagged package's folder: it packs
