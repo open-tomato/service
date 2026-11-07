@@ -9,13 +9,13 @@ Each public package versions on its own and publishes to npmjs under the
   `main` and release as 1.x.
 - **2.0, on `v2`.** The work for Nest.js and Next.js changes the public
   contract: the core takes an injected logger and stops exporting
-  `createServiceLogger`, one health rule replaces three, and
-  `service-mcp` moves to MCP SDK v2. It lives on the `v2` branch until it
-  is done. Before 2.0.0 releases, `main` merges into `v2`, so every 1.x
-  fix carries over. A prerelease such as `2.0.0-next.1` publishes under
-  the `next` dist-tag and never becomes `latest`.
-  Pull requests for 2.0 go into `v2`, where CI runs the same gates as
-  on `main`.
+  `createServiceLogger`, and one health rule replaces three. 2.0.0
+  releases from `v2` as a plain version under `latest`, because rafa
+  settles no prerelease. A later break in one adapter is that adapter's
+  own next major and never holds the core back: `service-mcp`'s move to
+  MCP SDK v2 releases as `service-mcp` 3.0.0. Before 2.0.0 releases,
+  `main` merges into `v2`, so every 1.x fix carries over. Pull requests
+  for 2.0 go into `v2`, where CI runs the same gates as on `main`.
 
 ## Steps
 
