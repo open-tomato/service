@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 — 2026-11-07, MCP on the shared core, with stdio logs on stderr
+<!-- rafa:fragments banner-service-once-service-mcp breadcrumb-hierarchy-service-mcp logging-output-service-mcp retry-and-client-names-service-mcp startup-ports-logging-service-mcp -->
+
+- mcp: the `started` line carries `service` once, on HTTP and on stdio.
+- mcp: A stdio MCP server's logs leave stdout for stderr, so they no longer break the protocol, and it now logs the `started` banner (transport `stdio`, no `url`) there once its transport is connected; `logger: { destination: 'stdout' }` overrides the pick, and HTTP keeps stdout.
+- mcp: the re-exported `createHttpClient` requires `opts.name`, as the core's does
+- mcp: `createMCP` takes `port`, `strictPort`, `version`, `features` and `health.strictPort` (or `PORT`, `PORT_STRICT`, `HEALTH_PORT` and `HEALTH_PORT_STRICT`), and its HTTP transport and health server fall back to the next free port with a warning instead of failing or crashing, or reject with `PortInUseError` when strict; the handle gains `ready()`, resolving with the bound ports and URLs or rejecting with the start error, `healthUrl()` names the bound health port, a `started` banner is logged once listening, and `McpServer` reports the configured version; a non-integer `PORT` or `HEALTH_PORT` now throws a `RangeError`, `startHealthServer` is async and resolves with its bound port (`HealthServerConfig` is exported), and a failed start no longer exits the process under `NODE_ENV=test` and closes the transport when the health server cannot listen.
+- docs: the README shows the `inDomain` and `scoped` chain with a step per call
+- docs: the README documents the port and strict settings with their env names, the fallback warning, the `started` banner and the handle's ports and URLs
+
 ## 1.0.2 — 2026-10-28, README with examples on the npm page
 <!-- rafa:fragments npm-readme-service-mcp -->
 
