@@ -156,7 +156,34 @@ export interface ResolvedPort {
   readonly port: number;
   /** Whether a taken port rejects instead of falling back. */
   readonly strict: boolean;
+  /**
+   * What a `PortInUseError` tells the operator to set: the environment
+   * variable when it gave the port, else the config key (for the default too).
+   */
+  readonly configKey: string;
 }
+
+/** The names one port is set by: its config key, its two variables and its default. */
+interface PortNames {
+  /** The config key, such as `port` or `health.port`. */
+  readonly configKey: string;
+  /** The variable that names the port, such as `PORT`. */
+  readonly portEnv: string;
+  /** The variable that names the strict flag, such as `PORT_STRICT`. */
+  readonly strictEnv: string;
+  /** The port when neither the config nor the variable names one. */
+  readonly defaultPort: number;
+}
+
+/** The names of the transport port. */
+const TRANSPORT_PORT_NAMES: PortNames = {
+  configKey: 'port', portEnv: 'PORT', strictEnv: 'PORT_STRICT', defaultPort: DEFAULT_PORT,
+};
+
+/** The names of the health server's port. */
+const HEALTH_PORT_NAMES: PortNames = {
+  configKey: 'health.port', portEnv: 'HEALTH_PORT', strictEnv: 'HEALTH_PORT_STRICT', defaultPort: DEFAULT_HEALTH_PORT,
+};
 
 /** The transport and health ports {@link resolvePortConfig} settled on. */
 export interface ResolvedPortConfig extends ResolvedPort {
@@ -187,26 +214,45 @@ function readStrictEnv(env: PortEnv, name: string): boolean | undefined {
 }
 
 /**
+ * Settles one port: the config field when set, else the variable, else the
+ * default; the strict flag the same way. `configKey` names the variable
+ * only when the variable gave the port.
+ */
+function resolvePort(
+  given: { readonly port?: number | undefined; readonly strictPort?: boolean | undefined } | undefined,
+  names: PortNames,
+  env: PortEnv,
+): ResolvedPort {
+  const fromEnv = given?.port === undefined
+    ? readPortEnv(env, names.portEnv)
+    : undefined;
+  return {
+    port: given?.port ?? fromEnv ?? names.defaultPort,
+    strict: given?.strictPort ?? readStrictEnv(env, names.strictEnv) ?? false,
+    configKey: fromEnv === undefined
+      ? names.configKey
+      : names.portEnv,
+  };
+}
+
+/**
  * Settles the transport and health ports and their strict flags for the MCP
  * adapter: each comes from the config field when set, else from its
  * environment variable (`PORT`, `PORT_STRICT`, `HEALTH_PORT`,
- * `HEALTH_PORT_STRICT`), else from the default (8080, 3001, `false`).
+ * `HEALTH_PORT_STRICT`), else from the default (8080, 3001, `false`). Each
+ * port carries the `configKey` a `PortInUseError` should name: the variable
+ * when it gave the port (`PORT`, `HEALTH_PORT`), else the config key
+ * (`port`, `health.port`).
  *
  * @param config - The `port`, `strictPort` and `health` fields of the MCP config.
  * @param env - The environment to read; defaults to `process.env`.
- * @returns The transport port and strict flag, and the health port and strict flag.
- * @throws {RangeError} If `PORT` or `HEALTH_PORT` is set to something other than a whole number.
+ * @returns The transport port, strict flag and config key, and the health server's.
+ * @throws {RangeError} If `PORT` or `HEALTH_PORT` is read and set to something other than a whole number.
  */
 export function resolvePortConfig(
   config: PortConfigInput,
   env: PortEnv = process.env,
 ): ResolvedPortConfig {
-  return {
-    port: config.port ?? readPortEnv(env, 'PORT') ?? DEFAULT_PORT,
-    strict: config.strictPort ?? readStrictEnv(env, 'PORT_STRICT') ?? false,
-    health: {
-      port: config.health?.port ?? readPortEnv(env, 'HEALTH_PORT') ?? DEFAULT_HEALTH_PORT,
-      strict: config.health?.strictPort ?? readStrictEnv(env, 'HEALTH_PORT_STRICT') ?? false,
-    },
-  };
+  const transport = resolvePort(config, TRANSPORT_PORT_NAMES, env);
+  return { ...transport, health: resolvePort(config.health, HEALTH_PORT_NAMES, env) };
 }

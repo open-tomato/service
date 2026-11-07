@@ -23,8 +23,12 @@ taken port the same way.
   `HEALTH_PORT_STRICT`, else `false`. Each of the four is settled on its
   own. A strict variable is `true` only for `true` or `1`, any case, around
   any whitespace. An empty port variable counts as unset, and one that is
-  not a whole number throws a `RangeError` naming the variable. `env`
-  defaults to `process.env`.
+  not a whole number throws a `RangeError` naming the variable; a variable
+  is read only when the config leaves its port unset. Each port carries the
+  `configKey` a `PortInUseError` should name: `PORT` or `HEALTH_PORT` when
+  the variable gave the port, else `port` or `health.port`, for the default
+  too. `createMCP` hands that key to the server, so the error tells the
+  operator to change what they set. `env` defaults to `process.env`.
 - `warnOnFallback(logger, pick, names)` logs one `warn` record when a pick
   fell back, with `takenPort`, the bound `port`, and the `strictKey` and
   `strictEnv` that turn the fallback into an error, and a message reading
@@ -80,9 +84,11 @@ The `resolvePortConfig` cases pass an `env` record, so they leave
 default and restores them. They check the defaults, the config read before
 the env, the env read when the config is silent, each value settled on its
 own, the transport and health names kept apart, a config port `0` counted
-as given, each strict and non-strict spelling, an empty port variable, and
-a malformed `PORT` or `HEALTH_PORT`. Reading `PORT` before the config and
-dropping the `1` spelling fail eight of them.
+as given, the config key named for a config or default port and the
+variable for an env port, a malformed variable ignored when the config
+names that port, each strict and non-strict spelling, an empty port
+variable, and a malformed `PORT` or `HEALTH_PORT`. Reading `PORT` before
+the config and dropping the `1` spelling fail eight of them.
 
 ## Usage
 

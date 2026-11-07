@@ -199,6 +199,7 @@ export function createMCP(config: MCPConfig): MCPHandle {
       return await startHealthServer({
         port: ports.health.port,
         strict: ports.health.strict,
+        configKey: ports.health.configKey,
         logger,
         path: resolved.health.path,
         serviceId: resolved.serviceId,
@@ -234,6 +235,7 @@ export function createMCP(config: MCPConfig): MCPHandle {
     const http = await wireHttpTransport(server, {
       port: ports.port,
       strict: ports.strict,
+      configKey: ports.configKey,
       logger,
     });
     transportInstance = http;
