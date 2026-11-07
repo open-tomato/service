@@ -5,9 +5,71 @@ export type { CreateDependencyOpts, CreateTypedDependencyOpts } from './dependen
 export type { Dependency, DependencyStatus, TypedDependency, InferInstance, DepsMap } from './types.js';
 
 export { createHttpClient } from './http-client.js';
-export { CircuitOpenError } from './circuit-breaker.js';
+export { CircuitBreaker, CircuitOpenError } from './circuit-breaker.js';
+export type { CircuitState } from './circuit-breaker.js';
+export { withRetry } from './retry.js';
 export type { TypedClient, ClientsMap, HttpClientOpts, RetryConfig, CircuitBreakerConfig } from './types.js';
 
-export { createServiceLogger } from './logger.js';
-export type { Logger, LoggerOptions, ServiceLogger } from './logger.js';
+export { createRuntime } from './runtime.js';
+export type { DependencyRecord, Runtime, RuntimeOptions, RuntimeState, StopResult } from './runtime.js';
+
+export {
+  controlStatus,
+  listDependencies,
+  pauseDependency,
+  resetClient,
+  restartDependency,
+  resumeDependency,
+  verifyControlToken,
+} from './control.js';
+export type {
+  ClientControlStatus,
+  ControlActionBody,
+  ControlResult,
+  ControlStatusBody,
+  ControlStatusOptions,
+  ControlTarget,
+  DependencyControlStatus,
+} from './control.js';
+
+export {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  InternalError,
+  NotFoundError,
+  UnauthorizedError,
+  ValidationError,
+} from './errors.js';
+export type { ErrorBody, FieldError } from './errors.js';
+export { toErrorResponse, zodToValidationError } from './error-response.js';
+export type { ErrorFormatter, ErrorResponse } from './error-response.js';
+export { isErrorBody, parseApiError } from './error-client.js';
+export type { ApiError } from './error-client.js';
+
+export { BaseServiceConfigSchema, ControlConfigSchema } from './schema.js';
+export type { BaseServiceConfig, ControlConfig, ResolvedBaseServiceConfig } from './schema.js';
+
+export { pickPort, PORT_FALLBACK_RANGE, PortInUseError } from './ports.js';
+export type { PickedPort, PickPortOptions, PortRange } from './ports.js';
+
+export { logStarted, STARTED_MESSAGE } from './banner.js';
+export type { BannerFeatureValue, StartupBanner } from './banner.js';
+
+export { aggregateHealth, HEALTH_HTTP_STATUS } from './health.js';
+export type { AggregateHealthOptions, HealthReport, HealthStatus } from './health.js';
+
+export {
+  createConsoleLogger,
+  DOMAIN_FIELD,
+  inDomain,
+  isTraceId,
+  SCOPE_FIELD,
+  scoped,
+  STEP_FIELD,
+  TRACE_ID_FIELD,
+  TRACE_ID_PATTERN,
+} from './logger.js';
+export type { ConsoleLoggerOptions, LogBreadcrumb, Logger, LogLevel, LogSink } from './logger.js';
 export type { ServicePlugin } from './types.js';

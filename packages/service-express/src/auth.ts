@@ -1,4 +1,4 @@
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 import type { Request, RequestHandler, Response } from 'express';
 
 /** Middleware that unconditionally calls `next()` — used as a no-op passthrough. */
@@ -52,7 +52,7 @@ function extractBearer(req: Request): string | null {
  * discloses full session claims (RFC 7662 §2.1 requires the endpoint be
  * protected). It is distinct from the end-user's session token.
  */
-export function createIntrospectVerifier(introspectUrl: string, logger: ServiceLogger, secret: string): SessionVerifier {
+export function createIntrospectVerifier(introspectUrl: string, logger: Logger, secret: string): SessionVerifier {
   return {
     async verify(token: string): Promise<SessionClaims | null> {
       try {
@@ -88,7 +88,7 @@ export function createIntrospectVerifier(introspectUrl: string, logger: ServiceL
  * verifies it through the introspect seam, and either attaches the claims to
  * `res.locals.auth` and continues, or responds `401`.
  */
-export function buildRequireAuth(introspectUrl: string, logger: ServiceLogger, secret: string): RequestHandler {
+export function buildRequireAuth(introspectUrl: string, logger: Logger, secret: string): RequestHandler {
   const verifier = createIntrospectVerifier(introspectUrl, logger, secret);
   return async (req, res, next) => {
     try {
@@ -113,7 +113,7 @@ export function buildRequireAuth(introspectUrl: string, logger: ServiceLogger, s
  * `res.locals.auth` when a valid token is present, but never rejects an
  * unauthenticated (or invalid-token) request.
  */
-export function buildOptionalAuth(introspectUrl: string, logger: ServiceLogger, secret: string): RequestHandler {
+export function buildOptionalAuth(introspectUrl: string, logger: Logger, secret: string): RequestHandler {
   const verifier = createIntrospectVerifier(introspectUrl, logger, secret);
   return async (req, res, next) => {
     try {

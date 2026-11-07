@@ -14,7 +14,6 @@ mostly configuration and the wiring of its endpoints.
 | `packages/service-express` | `@open-tomato/service-express` | Express 5 adapter |
 | `packages/service-mcp` | `@open-tomato/service-mcp` | Model Context Protocol adapter |
 | `packages/service-logger` | `@open-tomato/service-logger` | pino logger, Node and browser entries |
-| `packages/service-errors` | `@open-tomato/service-errors` | private; being split into core and Express |
 
 The core never imports a framework, and an adapter never re-implements what
 the core can own. `context/architecture.md` has the layering, where each
@@ -24,8 +23,16 @@ concern lives today, and what is moving.
 
 `bun run gates` runs lint, check-types, test, test-scripts, build, pack
 and check-node, in that order, and stops at the first failure. Test files are
-type-checked too. `context/verification.md` says what each gate proves and
-how to run one scoped to a change.
+type-checked too. lint and check-types also keep the core free of Node-only
+imports and globals; `context/architecture.md` has the rule.
+`context/verification.md` says what each gate proves and how to run one
+scoped to a change.
+
+Each Edit or Write runs `eslint --fix` on its file
+(`.claude/hooks/eslint-fix.ts`, registered in `.claude/settings.json`), so
+what ESLint can repair by itself is fixed as it is written. Run
+`bun run lint:fix` before the gates to sweep the rest, and fix by hand only
+what it leaves.
 
 ## Docs: the shadow tree
 

@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import type { HttpClientOpts } from './types.js';
+
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { CircuitOpenError } from './circuit-breaker.js';
 import { createHttpClient } from './http-client.js';
@@ -20,7 +22,7 @@ class FakeClient {
 describe('createHttpClient — positive', () => {
   it('returns the underlying client resolved value through the Proxy', async () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     const result = await client.fetchData();
 
@@ -30,7 +32,7 @@ describe('createHttpClient — positive', () => {
 
   it('forwards arguments to the underlying method', async () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     const result = await client.getUser(42);
 
@@ -40,21 +42,21 @@ describe('createHttpClient — positive', () => {
 
   it('exposes non-function properties from the underlying client', () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     expect(client.baseUrl).toBe('https://api.example.com');
   });
 
   it('starts with status "running" (circuit closed)', async () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     expect(client.status).toBe('running');
   });
 
   it('start() clears stopped state', async () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     await client.stop();
     expect(client.status).toBe('stopped');
@@ -65,7 +67,7 @@ describe('createHttpClient — positive', () => {
 
   it('stop() sets status to "stopped"', async () => {
     const sdk = new FakeClient();
-    const client = createHttpClient(sdk);
+    const client = createHttpClient(sdk, { name: 'fake' });
 
     await client.stop();
 
@@ -83,6 +85,7 @@ describe('createHttpClient — positive', () => {
     };
 
     const client = createHttpClient(sdk, {
+      name: 'fake',
       retry: { attempts: 5, backoff: 'linear', jitter: false },
     });
 
@@ -106,6 +109,7 @@ describe('createHttpClient — positive', () => {
 
     // threshold 5 so 4 failures keep circuit closed
     const client = createHttpClient(sdk, {
+      name: 'fake',
       retry: { attempts: 1 },
       circuitBreaker: { threshold: 5, timeout: 30_000 },
     });
@@ -138,6 +142,7 @@ describe('createHttpClient — negative', () => {
 
     // threshold 1 so the first failure opens the circuit
     const client = createHttpClient(sdk, {
+      name: 'fake',
       retry: { attempts: 1 },
       circuitBreaker: { threshold: 1, timeout: 60_000 },
     });
@@ -160,6 +165,7 @@ describe('createHttpClient — negative', () => {
     };
 
     const client = createHttpClient(sdk, {
+      name: 'fake',
       retry: { attempts: 3, backoff: 'linear', jitter: false },
       circuitBreaker: { threshold: 10 }, // high threshold so circuit stays closed
     });
@@ -180,6 +186,7 @@ describe('createHttpClient — negative', () => {
     // threshold 2: circuit opens after 2 circuit-breaker failures
     // Each call does 3 retry attempts but counts as 1 circuit-breaker failure
     const client = createHttpClient(sdk, {
+      name: 'fake',
       retry: { attempts: 3, backoff: 'linear', jitter: false },
       circuitBreaker: { threshold: 2, timeout: 60_000 },
     });
@@ -197,5 +204,45 @@ describe('createHttpClient — negative', () => {
     // Third call: circuit is open, no sdk call
     await expect(client.action()).rejects.toBeInstanceOf(CircuitOpenError);
     expect(failures).toBe(6); // unchanged
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Name
+// ---------------------------------------------------------------------------
+
+/** The error a missing or blank name raises: a TypeError that names the field. */
+const NAME_ERROR = new TypeError('createHttpClient: opts.name must be a non-empty string');
+
+describe('createHttpClient — name', () => {
+  it('names the client from opts.name', () => {
+    const client = createHttpClient(new FakeClient(), { name: 'inventory' });
+
+    expect(client.name).toBe('inventory');
+  });
+
+  it('keeps two clients apart by name', () => {
+    const inventory = createHttpClient(new FakeClient(), { name: 'inventory' });
+    const payments = createHttpClient(new FakeClient(), { name: 'payments' });
+
+    expect([inventory.name, payments.name]).toEqual(['inventory', 'payments']);
+  });
+
+  it('requires a string name in its options type', () => {
+    expectTypeOf<HttpClientOpts['name']>().toEqualTypeOf<string>();
+  });
+
+  it('rejects a call without options', () => {
+    // @ts-expect-error -- the options are required, for their name
+    expect(() => createHttpClient(new FakeClient())).toThrow(NAME_ERROR);
+  });
+
+  it('rejects options without a name', () => {
+    // @ts-expect-error -- name is required
+    expect(() => createHttpClient(new FakeClient(), { retry: { attempts: 1 } })).toThrow(NAME_ERROR);
+  });
+
+  it.each(['', '   '])('rejects the blank name %j', (name) => {
+    expect(() => createHttpClient(new FakeClient(), { name })).toThrow(NAME_ERROR);
   });
 });

@@ -1,4 +1,4 @@
-import type { ServiceLogger } from '@open-tomato/service';
+import type { Logger } from '@open-tomato/service';
 import type { Server } from 'node:http';
 
 import { createDependency } from '@open-tomato/service';
@@ -80,7 +80,7 @@ describe('shutdown — stop() behaviour', () => {
 // ---------------------------------------------------------------------------
 
 describe('gracefulStop — drain timeout', () => {
-  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as ServiceLogger;
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as unknown as Logger;
 
   /** A server whose close() finishes only when every connection is closed. */
   function serverWithOpenConnection(closesAtOnce: boolean) {

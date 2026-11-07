@@ -1,13 +1,17 @@
 import type { ResolvedServiceConfig } from './schema.js';
-import type { ServiceLogger } from '@open-tomato/service';
-import type { Application, ErrorRequestHandler } from 'express';
+import type { Logger } from '@open-tomato/service';
+import type { Application } from 'express';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Logger as PinoLogger } from 'pino';
 
+import { randomUUID } from 'node:crypto';
+
+import { isTraceId, TRACE_ID_FIELD } from '@open-tomato/service';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
 import expressRateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import pino from 'pino';
 import { pinoHttp } from 'pino-http';
 
 /** Request headers that carry credentials, removed from every request log entry. */
@@ -16,6 +20,27 @@ const REDACTED_HEADERS = [
   'req.headers.cookie',
   'req.headers["x-api-key"]',
 ];
+
+/** The header a request id arrives on and the response answers with. */
+export const REQUEST_ID_HEADER = 'x-request-id';
+
+/**
+ * Picks the id of a request: its `x-request-id` header when `isTraceId` from
+ * `@open-tomato/service` accepts it (`[A-Za-z0-9._:-]{1,64}`), else a new UUID.
+ * The response answers with the id chosen, on `x-request-id`.
+ *
+ * @param req - The incoming request.
+ * @param res - The response the id is echoed on.
+ * @returns The request id pino-http stores as `req.id`.
+ */
+export function genRequestId(req: IncomingMessage, res: ServerResponse): string {
+  const header = req.headers[REQUEST_ID_HEADER];
+  const id = isTraceId(header)
+    ? header
+    : randomUUID();
+  res.setHeader(REQUEST_ID_HEADER, id);
+  return id;
+}
 
 /**
  * Attaches the standard middleware stack to the given Express app.
@@ -27,20 +52,23 @@ const REDACTED_HEADERS = [
  * 4. `express.urlencoded` — parses URL-encoded bodies
  * 5. `cookie-parser` — parses Cookie headers
  * 6. `express-rate-limit` — limits requests per window (default 100 req / 60 s)
- * 7. `pino-http` — HTTP request/response logging via a dedicated pino instance
+ * 7. `pino-http` — request/response logging through the service logger; each request
+ *    gets an id from {@link genRequestId}, and `req.log` binds only that id, as
+ *    `traceId` (`quietReqLogger`), so a crumb carries no `req`; the
+ *    `request completed` line carries `req`, `res` and `responseTime` under the
+ *    same `traceId`
  *
  * @param app - The Express application to configure.
  * @param config - Resolved service configuration.
- * @param logger - The service logger; used to emit a startup trace and available for
- *   future middleware that needs access to the service logger.
+ * @param logger - The service logger. pino-http writes through it, so it must be a
+ *   pino logger at runtime, as `createLogger` from service-logger returns.
  */
 export function applyMiddleware(
   app: Application,
   config: ResolvedServiceConfig,
-  logger: ServiceLogger,
+  logger: Logger,
 ): void {
   logger.debug({ serviceId: config.serviceId }, 'applying middleware');
-  const httpLogger = pino({ name: config.serviceId });
   app.use(helmet());
   app.use(cors(config.cors
     ? { origin: config.cors.origins }
@@ -53,39 +81,12 @@ export function applyMiddleware(
       config.rateLimit ?? { max: 100, windowMs: 60_000, standardHeaders: true, legacyHeaders: false },
     ),
   );
-  app.use(pinoHttp({ logger: httpLogger, redact: REDACTED_HEADERS }));
+  app.use(pinoHttp({
+    logger: logger as unknown as PinoLogger,
+    redact: REDACTED_HEADERS,
+    genReqId: genRequestId,
+    quietReqLogger: true,
+    customAttributeKeys: { reqId: TRACE_ID_FIELD },
+  }));
 }
 
-/** The first status code of the server-error range. */
-const SERVER_ERROR_STATUS = 500;
-
-/** The only message a server error sends to the client. */
-const GENERIC_SERVER_ERROR = 'Internal Server Error';
-
-type HttpError = {
-  status?: number;
-  statusCode?: number;
-  message?: string;
-};
-
-/**
- * Express error-handling middleware that converts thrown errors into JSON responses.
- *
- * Must be registered **after** all route handlers:
- * ```ts
- * app.use(errorHandler)
- * ```
- *
- * Reads `err.status` or `err.statusCode` for the HTTP status; falls back to 500.
- * A client error (4xx) answers with the error's message. A server error (5xx)
- * answers with a fixed message, because its text can carry internal detail.
- */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-  const httpErr = err as HttpError;
-  const status = httpErr.status ?? httpErr.statusCode ?? 500;
-  const message = status < SERVER_ERROR_STATUS
-    ? httpErr.message ?? GENERIC_SERVER_ERROR
-    : GENERIC_SERVER_ERROR;
-  res.status(status).json({ error: message });
-};

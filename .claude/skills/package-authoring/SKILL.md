@@ -15,8 +15,8 @@ adapter.
 | File | What it holds |
 |---|---|
 | `package.json` | the manifest below |
-| `tsconfig.json` | `extends ../../tsconfig.base.json`; includes `src` and `tests` |
-| `tsconfig.build.json` | emits JS, declarations and maps from `src` to `dist`; excludes tests |
+| `tsconfig.json` | `extends @open-tomato/typescript-config/node`; includes `src` and `tests` |
+| `tsconfig.build.json` | extends `./tsconfig.json` and `@open-tomato/typescript-config/build`; emits JS and declarations from `src` to `dist`; excludes tests |
 | `src/index.ts` | the only entry; everything public is exported from here |
 | `src/*.test.ts` or `tests/` | vitest suites; both are type-checked |
 

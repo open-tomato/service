@@ -18,16 +18,37 @@ This table shows each concern's home today and where it is moving.
 | Concern | Today | Target |
 |---|---|---|
 | Dependency lifecycle: start, stop, pause, resume | core, `createDependency` | core |
-| Service runtime: start in order, stop in reverse | Express adapter only | core `createRuntime`, used by every adapter |
-| Health aggregation | one rule per adapter | one core function |
-| Control operations: status, pause, resume, restart | Express adapter | core; the HTTP routes stay in the adapter |
-| Typed HTTP clients | core, `createHttpClient` | core |
-| Retry with exponential backoff | core, not exported | core, exported |
-| Circuit breaker | core, only `CircuitOpenError` exported | core, exported |
-| Logging | core builds a pino logger through `service-logger` | core takes an injected logger |
-| Errors | `service-errors` | error classes in core, the HTTP handler in the Express adapter |
-| Config contracts | one schema per adapter | a base schema in core that adapters extend |
+| Service runtime: start in order, stop in reverse | core `createRuntime`; the Express adapter still runs its own loop | core `createRuntime`, used by every adapter |
+| Health aggregation | core `aggregateHealth`; each adapter still has its own rule | the core function, used by every adapter |
+| Control operations: status, pause, resume, restart | core functions; the Express adapter still runs its own | core; the HTTP routes stay in the adapter |
+| Typed HTTP clients | core, `createHttpClient`, named by the caller | core |
+| Retry with exponential backoff | core, `withRetry` exported | core |
+| Circuit breaker | core, `CircuitBreaker` exported | core |
+| Logging | core takes an injected `Logger`, console by default | core |
+| Errors | core classes and `toErrorResponse`; the Express handler answers with them, its control routes still answer `{ error }` | core; each adapter maps them onto its transport |
+| Config contracts | core `BaseServiceConfigSchema`; each adapter still has its own schema | the base schema, extended by each adapter |
 | OpenAPI | not built | core describes the routes, adapters render the document |
+
+## Keeping the core portable
+
+The core's sources (`packages/service/src`, tests aside) use web-standard
+globals only, so the core can run where Node does not. Two gates hold that
+line:
+
+- **lint** rejects an import of a Node built-in (`node:*` or a bare name
+  such as `fs`), pino or `service-logger`, and a read of a Node-only global
+  such as `process` or `Buffer`. Environment variables go through
+  `readEnv()`, which reads `globalThis.process` only where it exists.
+- **check-types** also compiles the sources with `tsconfig.build.json`,
+  which has no Node types and the `ES2023` and `WebWorker` libraries, so
+  the same code fails to type-check.
+
+The core's one dependency is zod, for the base config schema, and zod has
+no Node-only code.
+
+There is no runtime check. vitest's `edge-runtime` environment keeps Node's
+`process`, `Buffer`, `require` and `setImmediate` in place, so a test run
+there passes code that reads them.
 
 ## Framework fit
 
@@ -39,7 +60,7 @@ This table shows each concern's home today and where it is moving.
   work in route handlers. A route starts its dependencies on first use,
   since there is no process to start them at boot, and breaker state lives
   per instance. The edge runtime needs the core free of Node-only modules,
-  which the injected logger provides.
+  which the injected logger and the portability guard provide.
 
 ## Known limits
 

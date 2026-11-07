@@ -9,8 +9,30 @@ export {
 export type { SessionClaims, SessionVerifier } from './auth.js';
 export type { ServiceConfig, ResolvedServiceConfig } from './schema.js';
 export type { ServiceHandle, ServiceContext, ClientsMap } from './types.js';
-export { createDependency, createHttpClient } from '@open-tomato/service';
-export type { Dependency, TypedDependency, DepsMap, TypedClient, ServicePlugin } from '@open-tomato/service';
+export { createErrorHandler } from './error-handler.js';
+export {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  createDependency,
+  createHttpClient,
+  ForbiddenError,
+  InternalError,
+  NotFoundError,
+  toErrorResponse,
+  UnauthorizedError,
+  ValidationError,
+} from '@open-tomato/service';
+export type {
+  Dependency,
+  DepsMap,
+  ErrorBody,
+  ErrorFormatter,
+  ErrorResponse,
+  ServicePlugin,
+  TypedClient,
+  TypedDependency,
+} from '@open-tomato/service';
 export type {
   ControlConfig,
   DependencyControlStatus,
