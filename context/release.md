@@ -29,9 +29,9 @@ Each public package versions on its own and publishes to npmjs under the
    `main` for a 1.x fix. Settle ends in one of two lines, and each leads
    somewhere else:
    - `✅ Pushed "chore: release …"`: the release commit is on the remote
-     only. Bring the local branch to it with
-     `git merge --ff-only origin/v2` (or `origin/main`) before tagging,
-     or the tag reads the versions from before the release.
+     only, and the tag reads each version from the local checkout. Run
+     `git pull --ff-only` before tagging, or the tag finds every version
+     already tagged and refuses.
    - `Nothing to settle`: no waiting fragment ships a release, so there
      is nothing to tag either. Stop here.
 3. **Tag.** `rafa release tag --push` reads each package's version at
