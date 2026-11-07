@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 — 2026-11-07, MCP's taken-port error names the variable that set the port
+<!-- rafa:fragments mcp-port-error-names-env -->
+
+- mcp: A `PortInUseError` under a strict port now says `set PORT` or `set HEALTH_PORT` when the environment variable gave the port, and `set port` or `set health.port` only when the config did, as the Express adapter does. Before, a start with `HEALTH_PORT` taken and `HEALTH_PORT_STRICT=true` told the operator to set `health.port`, a field they had not used.
+
 ## 2.0.0 — 2026-11-07, MCP on the shared core, with stdio logs on stderr
 <!-- rafa:fragments banner-service-once-service-mcp breadcrumb-hierarchy-service-mcp logging-output-service-mcp retry-and-client-names-service-mcp startup-ports-logging-service-mcp -->
 
