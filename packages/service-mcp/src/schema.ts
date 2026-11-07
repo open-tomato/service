@@ -1,4 +1,4 @@
-import type { MCPContext } from './types.js';
+import type { MCPConfig, MCPContext, ResolvedMCPConfig } from './types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { LoggerOptions, TypedClient } from '@open-tomato/service';
 
@@ -15,7 +15,7 @@ import { z } from 'zod';
  * - `health.path` — URL path for the health check route; defaults to `'/health'`
  * - `logger` — optional `LoggerOptions` forwarded to `@open-tomato/service-logger`; sensible defaults applied when omitted
  */
-export const MCPConfigSchema = z.object({
+export const MCPConfigSchema: z.ZodType<ResolvedMCPConfig, MCPConfig> = z.object({
   serviceId: z.string().min(1),
   clients: z.array(z.custom<TypedClient<unknown>>()).default([]),
   setup: z.custom<(server: McpServer, ctx: MCPContext) => void | Promise<void>>(

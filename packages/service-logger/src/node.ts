@@ -6,6 +6,7 @@
  * instead (resolved automatically via the `browser` export condition).
  */
 import type { Logger, LoggerOptions, LogLevel, HttpLoggerOptions } from './types.js';
+import type { HttpLogger } from 'pino-http';
 
 import { randomUUID } from 'node:crypto';
 import process from 'node:process';
@@ -73,7 +74,7 @@ const DEFAULT_IGNORE_ROUTES = ['/_health', '/_control'];
  * app.use(createHttpLogger({ ignoreRoutes: ['/metrics'] }));
  * ```
  */
-export function createHttpLogger(options?: HttpLoggerOptions) {
+export function createHttpLogger(options?: HttpLoggerOptions): HttpLogger {
   const envRedact = process.env['LOG_REDACT']
     ? process.env['LOG_REDACT'].split(',')
     : [];
