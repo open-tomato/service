@@ -23,16 +23,32 @@ Each public package versions on its own and publishes to npmjs under the
    with a `level` of `patch`, `minor`, `major` or `none` and the package
    it releases. A branch never edits a version or a changelog itself.
 2. **Settle.** `rafa release settle` folds the fragments waiting on
-   `main` into each package's version and `CHANGELOG.md`, in one release
-   commit.
-3. **Tag.** `rafa release tag --push` tags each settled package as
-   `<name>@<version>` and pushes the tags.
+   `origin/<pr.base>` into each package's version and `CHANGELOG.md`, in
+   one release commit, and pushes that commit there. `pr.base` in
+   `.rafa/config.yaml` names the release line: `v2` while 2.0 is in work,
+   `main` for a 1.x fix. Settle ends in one of two lines, and each leads
+   somewhere else:
+   - `✅ Pushed "chore: release …"`: the release commit is on the remote
+     only. Bring the local branch to it with
+     `git merge --ff-only origin/v2` (or `origin/main`) before tagging,
+     or the tag reads the versions from before the release.
+   - `Nothing to settle`: no waiting fragment ships a release, so there
+     is nothing to tag either. Stop here.
+3. **Tag.** `rafa release tag --push` reads each package's version at
+   `HEAD`, tags it as `<name>@<version>` and pushes the tags. Run it on
+   the release commit only: on any other commit every version already
+   has its tag, and the command answers with one `already names` refusal
+   per package. From the rafa release after 0.52.0, the tag also refuses
+   a branch behind its remote by itself (open-tomato/rafa#1518).
 4. **Publish.** A pushed tag starts `.github/workflows/release-publish.yml`,
    which runs the gates and `rafa release publish`. That runs
    `scripts/publish-package.ts` in each tagged package's folder: it packs
    the package as the pack check does, refuses a tarball the check
    rejects, and runs `npm publish` on the tarball. npm trusted publishing
    signs in from the workflow and adds provenance, so no token is stored.
+
+Settle and tag therefore never run as one `&&` chain: the line settle
+prints decides whether the tag comes next.
 
 The workflow's job runs only while the repository variable
 `RAFA_RELEASE_PUBLISH` is `ci`.
