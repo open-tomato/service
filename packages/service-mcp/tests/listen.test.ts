@@ -212,7 +212,8 @@ describe('resolvePortConfig', () => {
   const defaults = {
     port: DEFAULT_PORT,
     strict: false,
-    health: { port: DEFAULT_HEALTH_PORT, strict: false },
+    configKey: 'port',
+    health: { port: DEFAULT_HEALTH_PORT, strict: false, configKey: 'health.port' },
   };
 
   it('answers the defaults when neither the config nor the env names a value', () => {
@@ -224,32 +225,51 @@ describe('resolvePortConfig', () => {
   it('reads the config before PORT, PORT_STRICT, HEALTH_PORT and HEALTH_PORT_STRICT', () => {
     const env = { PORT: '4100', PORT_STRICT: 'true', HEALTH_PORT: '4101', HEALTH_PORT_STRICT: '1' };
     const config = { port: 4200, strictPort: false, health: { port: 4201, strictPort: false } };
-    expect(resolvePortConfig(config, env))
-      .toEqual({ port: 4200, strict: false, health: { port: 4201, strict: false } });
+    expect(resolvePortConfig(config, env)).toEqual({
+      port: 4200, strict: false, configKey: 'port', health: { port: 4201, strict: false, configKey: 'health.port' },
+    });
   });
 
   it('reads the four env names when the config leaves them out', () => {
     const env = { PORT: '4100', PORT_STRICT: 'true', HEALTH_PORT: '4101', HEALTH_PORT_STRICT: '1' };
-    expect(resolvePortConfig({ health: {} }, env))
-      .toEqual({ port: 4100, strict: true, health: { port: 4101, strict: true } });
+    expect(resolvePortConfig({ health: {} }, env)).toEqual({
+      port: 4100, strict: true, configKey: 'PORT', health: { port: 4101, strict: true, configKey: 'HEALTH_PORT' },
+    });
   });
 
   it('settles each port and strict flag on its own', () => {
     const env = { PORT: '4100', PORT_STRICT: '1', HEALTH_PORT: '4101', HEALTH_PORT_STRICT: 'false' };
-    expect(resolvePortConfig({ port: 4200, health: { strictPort: true } }, env))
-      .toEqual({ port: 4200, strict: true, health: { port: 4101, strict: true } });
+    expect(resolvePortConfig({ port: 4200, health: { strictPort: true } }, env)).toEqual({
+      port: 4200, strict: true, configKey: 'port', health: { port: 4101, strict: true, configKey: 'HEALTH_PORT' },
+    });
   });
 
   it('keeps the transport and health names apart', () => {
-    expect(resolvePortConfig({}, { PORT: '4100', PORT_STRICT: '1' }))
-      .toEqual({ port: 4100, strict: true, health: { port: DEFAULT_HEALTH_PORT, strict: false } });
-    expect(resolvePortConfig({}, { HEALTH_PORT: '4101', HEALTH_PORT_STRICT: '1' }))
-      .toEqual({ port: DEFAULT_PORT, strict: false, health: { port: 4101, strict: true } });
+    expect(resolvePortConfig({}, { PORT: '4100', PORT_STRICT: '1' })).toEqual({
+      ...defaults, port: 4100, strict: true, configKey: 'PORT',
+    });
+    expect(resolvePortConfig({}, { HEALTH_PORT: '4101', HEALTH_PORT_STRICT: '1' })).toEqual({
+      ...defaults, health: { port: 4101, strict: true, configKey: 'HEALTH_PORT' },
+    });
   });
 
   it('takes port 0 from the config as given, not as unset', () => {
-    expect(resolvePortConfig({ port: 0, health: { port: 0 } }, { PORT: '4100', HEALTH_PORT: '4101' }))
-      .toEqual({ port: 0, strict: false, health: { port: 0, strict: false } });
+    expect(resolvePortConfig({ port: 0, health: { port: 0 } }, { PORT: '4100', HEALTH_PORT: '4101' })).toEqual({
+      port: 0, strict: false, configKey: 'port', health: { port: 0, strict: false, configKey: 'health.port' },
+    });
+  });
+
+  it('names the config key for a port the config or the default gave, and the variable for one the env gave', () => {
+    expect(resolvePortConfig({}, {})).toMatchObject({ configKey: 'port', health: { configKey: 'health.port' } });
+    expect(resolvePortConfig({ port: 4200, health: { port: 4201 } }, { PORT: '4100', HEALTH_PORT: '4101' }))
+      .toMatchObject({ configKey: 'port', health: { configKey: 'health.port' } });
+    expect(resolvePortConfig({}, { PORT: '4100', HEALTH_PORT: '4101' }))
+      .toMatchObject({ configKey: 'PORT', health: { configKey: 'HEALTH_PORT' } });
+  });
+
+  it('ignores a malformed variable when the config names that port', () => {
+    expect(resolvePortConfig({ port: 4200, health: { port: 4201 } }, { PORT: 'abc', HEALTH_PORT: 'abc' }))
+      .toMatchObject({ port: 4200, health: { port: 4201 } });
   });
 
   it.each(['true', '1', 'TRUE', ' 1 '])('reads a strict value of %j as strict', (value) => {
@@ -287,8 +307,9 @@ describe('resolvePortConfig', () => {
     process.env['HEALTH_PORT'] = '4301';
     process.env['HEALTH_PORT_STRICT'] = 'true';
     try {
-      expect(resolvePortConfig({}))
-        .toEqual({ port: 4300, strict: true, health: { port: 4301, strict: true } });
+      expect(resolvePortConfig({})).toEqual({
+        port: 4300, strict: true, configKey: 'PORT', health: { port: 4301, strict: true, configKey: 'HEALTH_PORT' },
+      });
     } finally {
       for (const [name, value] of saved) {
         if (value === undefined) delete process.env[name];

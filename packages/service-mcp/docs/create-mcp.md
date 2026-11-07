@@ -20,7 +20,9 @@ and, in HTTP mode, starts the health server.
 The transport and health ports come from `resolvePortConfig` (`listen.md`)
 and are picked by `wireHttpTransport` (`transport.md`) and
 `startHealthServer` (`health.md`), each of which logs its own fallback
-warning.
+warning. Each server also gets the `configKey` that call settled, so a
+`PortInUseError` under a strict port names `PORT` or `HEALTH_PORT` when the
+variable set the port, and `port` or `health.port` when the config did.
 
 ## The startup banner
 
@@ -68,13 +70,18 @@ transport fails, that the transport is resolved once and before the
 logger is built, the options `createLogger` receives on stdio, on HTTP
 and on stdio with `logger: { destination: 'stdout' }`, the `version` and
 `features` defaults, the version handed to `McpServer`, the exit outside
-`NODE_ENV=test` and its absence under it,
-that the transport is closed when the health server fails, and that an
-unawaited failure raises no `unhandledRejection`. Removing the rejection
-handler, the test-mode guard, the transport close, the configured version,
+`NODE_ENV=test` and its absence under it, the `configKey` each server
+receives with and without `PORT` and `HEALTH_PORT` set, that the transport
+is closed when the health server fails, and that an unawaited failure
+raises no `unhandledRejection`. Removing the rejection handler, the
+test-mode guard, the transport close, the configured version,
 `healthFallbackPort`, the bound `healthUrl`, the stderr pick, the config's
-precedence over it or the absence of `url` on the stdio record each fails
-at least one case.
+precedence over it, the absence of `url` on the stdio record or the
+`configKey` handed on each fails at least one case.
+`tests/createMCP.ports.integration.test.ts` holds both ports with real
+sockets and checks the fallback, the strict rejection, and the message of
+that rejection: `health.port` when the config set the port, `HEALTH_PORT`
+or `PORT` when the variable did.
 
 `tests/createMCP.destination.test.ts` runs the start through the real logger
 and checks which stream the `setup` line, the `started` banner and the

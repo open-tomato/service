@@ -4,7 +4,7 @@
  * the next ports, and a strict flag turns the taken port into a
  * `PortInUseError`.
  */
-import type { MCPHandle } from '../src/types.js';
+import type { MCPConfig, MCPHandle } from '../src/types.js';
 import type { Logger } from '@open-tomato/service';
 import type { Server } from 'node:net';
 
@@ -49,12 +49,18 @@ describe('createMCP port fallback over real servers', () => {
   let warn: ReturnType<typeof vi.spyOn> | undefined;
   let info: ReturnType<typeof vi.spyOn> | undefined;
 
-  /** Starts a handle on the held ports, spying on its logger from inside `setup`. */
-  function start(health: { strictPort?: boolean } = {}): MCPHandle {
+  /**
+   * Starts a handle on the held ports, spying on its logger from inside
+   * `setup`. `ports` replaces the port fields of the config, so a case can
+   * leave a port to the environment.
+   */
+  function start(
+    health: { strictPort?: boolean } = {},
+    ports: Pick<MCPConfig, 'port' | 'health'> = { port: MCP_PORT, health: { port: HEALTH_PORT, ...health } },
+  ): MCPHandle {
     handle = createMCP({
       serviceId: 'ports-test',
-      port: MCP_PORT,
-      health: { port: HEALTH_PORT, ...health },
+      ...ports,
       logger: { level: 'silent' },
       setup: (_server, { logger }: { logger: Logger }) => {
         warn = vi.spyOn(logger, 'warn');
@@ -107,21 +113,45 @@ describe('createMCP port fallback over real servers', () => {
     });
   });
 
-  it('rejects ready() with PortInUseError when health.strictPort is true', async () => {
+  it('rejects ready() with PortInUseError naming health.port when health.strictPort is true', async () => {
     const error = await start({ strictPort: true }).ready()
       .catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(PortInUseError);
+    expect((error as Error).message).toBe(`port ${HEALTH_PORT} is taken; set health.port to a free port`);
     expect(callsOf(info!).some(call => call[1] === 'started')).toBe(false);
   });
 
-  it('rejects ready() with PortInUseError when HEALTH_PORT_STRICT is true', async () => {
+  it('rejects ready() with PortInUseError naming health.port when HEALTH_PORT_STRICT is true', async () => {
     process.env['HEALTH_PORT_STRICT'] = 'true';
 
     const error = await start().ready()
       .catch((err: unknown) => err);
 
     expect(error).toBeInstanceOf(PortInUseError);
+    expect((error as Error).message).toBe(`port ${HEALTH_PORT} is taken; set health.port to a free port`);
     expect(callsOf(info!).some(call => call[1] === 'started')).toBe(false);
+  });
+
+  it('names HEALTH_PORT in the PortInUseError when HEALTH_PORT gave the port and HEALTH_PORT_STRICT is true', async () => {
+    process.env['HEALTH_PORT'] = String(HEALTH_PORT);
+    process.env['HEALTH_PORT_STRICT'] = 'true';
+
+    const error = await start({}, { port: MCP_PORT }).ready()
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(PortInUseError);
+    expect((error as Error).message).toBe(`port ${HEALTH_PORT} is taken; set HEALTH_PORT to a free port`);
+  });
+
+  it('names PORT in the PortInUseError when PORT gave the port and PORT_STRICT is true', async () => {
+    process.env['PORT'] = String(MCP_PORT);
+    process.env['PORT_STRICT'] = 'true';
+
+    const error = await start({}, { health: { port: HEALTH_PORT } }).ready()
+      .catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(PortInUseError);
+    expect((error as Error).message).toBe(`port ${MCP_PORT} is taken; set PORT to a free port`);
   });
 });

@@ -151,6 +151,30 @@ describe('createMCP', () => {
     );
   });
 
+  it('hands each server the config key when the config or the default gave its port', async () => {
+    createMCP(makeConfig());
+    await tick();
+
+    expect(wireHttpTransport).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ configKey: 'port' }));
+    expect(startHealthServer).toHaveBeenCalledWith(expect.objectContaining({ configKey: 'health.port' }));
+  });
+
+  it('hands each server the variable name when PORT or HEALTH_PORT gave its port', async () => {
+    vi.stubEnv('PORT', '8123');
+    vi.stubEnv('HEALTH_PORT', '3123');
+
+    createMCP(makeConfig());
+    await tick();
+
+    expect(wireHttpTransport).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ port: 8123, configKey: 'PORT' }),
+    );
+    expect(startHealthServer).toHaveBeenCalledWith(
+      expect.objectContaining({ port: 3123, configKey: 'HEALTH_PORT' }),
+    );
+  });
+
   it('calls setup with the McpServer instance and context', async () => {
     createMCP(makeConfig());
     await tick();
