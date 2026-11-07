@@ -1,10 +1,10 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "root: scripts and config files, run by Bun; each package has its own",
-  "extends": "./tsconfig.base.json",
+  // tooling: the scripts never ship, and allowJs (for the root *.mjs files)
+  // cannot run with isolatedDeclarations.
+  "extends": ["@open-tomato/typescript-config/bun", "@open-tomato/typescript-config/tooling"],
   "compilerOptions": {
-    "module": "Preserve",
-    "moduleResolution": "bundler",
     "allowJs": true,
     "types": ["node", "bun"]
   },

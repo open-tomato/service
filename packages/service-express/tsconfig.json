@@ -1,5 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "../../tsconfig.base.json",
+  "extends": "@open-tomato/typescript-config/node",
+  "compilerOptions": {
+    // ServiceConfig and ResolvedServiceConfig, the public config types, are
+    // inferred from the Zod ServiceConfigSchema in src/schema.ts; annotating
+    // the schema would restate them by hand. Tracked as a follow-up.
+    "isolatedDeclarations": false
+  },
   "include": ["src", "tests"]
 }
