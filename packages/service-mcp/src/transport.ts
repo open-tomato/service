@@ -1,19 +1,30 @@
+import type { SessionServerFactory } from './http-sessions.js';
 import type { MCPTransport } from './types.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import process from 'node:process';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 
-/** The HTTP transport and the Node server that feeds it. */
+import { createHttpSessions } from './http-sessions.js';
+
+/** The HTTP server and the sessions it serves. */
 export interface HttpTransportHandle {
-  /** The connected Streamable HTTP transport. */
-  readonly transport: StreamableHTTPServerTransport;
-  /** Closes the transport, then the HTTP server and its open connections. */
+  /** The number of MCP sessions open right now. */
+  sessionCount(): number;
+  /** Closes every session, then the HTTP server and its open connections. */
   close(): Promise<void>;
+}
+
+/** What `wireHttpTransport` needs. */
+export interface HttpTransportOptions {
+  /** Builds the `McpServer` for each new session, tools registered. */
+  readonly createSessionServer: SessionServerFactory;
+  /** The port to listen on (typically `PORT`, defaulting to `8080`). */
+  readonly port: number;
+  /** Receives the error when a session cannot be opened. */
+  readonly onError?: (error: unknown) => void;
 }
 
 /**
@@ -37,47 +48,43 @@ export function resolveTransport(): MCPTransport {
 }
 
 /**
- * Constructs a `StreamableHTTPServerTransport`, starts a Node HTTP server on
- * `port` that hands every request to the transport, and connects the
- * transport to `server`.
+ * Starts a Node HTTP server on `options.port` that serves one MCP session
+ * per client: each `initialize` gets its own `StreamableHTTPServerTransport`
+ * connected to a fresh server from `options.createSessionServer`, and later
+ * requests reach their session by the `Mcp-Session-Id` header.
  *
- * @param server - The MCP SDK server instance to connect the transport to.
- * @param port   - The port on which the MCP HTTP server should listen (typically
- *                 read from the `PORT` env var, defaulting to `8080`).
- * @returns A handle holding the transport, whose `close()` also stops the
- *          HTTP server.
+ * @param options - The session server factory, the port and the error sink.
+ * @returns A handle whose `close()` ends every session and stops the server.
  *
  * @example
  * ```ts
  * const port = Number(process.env['PORT'] ?? 8080);
- * const handle = await wireHttpTransport(server, port);
+ * const handle = await wireHttpTransport({ createSessionServer, port });
  * ```
  */
-export async function wireHttpTransport(
-  server: McpServer,
-  port: number,
-): Promise<HttpTransportHandle> {
-  const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => randomUUID(),
+export async function wireHttpTransport(options: HttpTransportOptions): Promise<HttpTransportHandle> {
+  const sessions = createHttpSessions({
+    createSessionServer: options.createSessionServer,
+    onError: options.onError,
   });
 
   const httpServer = createServer((req, res) => {
-    transport.handleRequest(req, res).catch(() => {
+    sessions.handleRequest(req, res).catch((error: unknown) => {
+      options.onError?.(error);
       if (!res.headersSent) res.writeHead(500);
       res.end();
     });
   });
   await new Promise<void>((resolve, reject) => {
     httpServer.once('error', reject);
-    httpServer.listen(port, () => resolve());
+    httpServer.listen(options.port, () => resolve());
   });
 
-  await server.connect(transport);
   return {
-    transport,
+    sessionCount: () => sessions.count(),
     close: async () => {
-      await transport.close();
-      // Streams the transport left open would keep close() waiting.
+      await sessions.closeAll();
+      // Streams a session left open would keep close() waiting.
       httpServer.closeAllConnections();
       await new Promise<void>(resolve => httpServer.close(() => resolve()));
     },

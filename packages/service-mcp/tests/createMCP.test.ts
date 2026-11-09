@@ -53,6 +53,14 @@ function tick(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
 
+/** The session server factory createMCP handed to the mocked wireHttpTransport. */
+async function sessionFactory(): Promise<() => Promise<unknown>> {
+  const { wireHttpTransport } = await import('../src/transport.js');
+  const options = vi.mocked(wireHttpTransport).mock.calls[0]?.[0];
+  if (options === undefined) throw new Error('wireHttpTransport was not called');
+  return async () => options.createSessionServer();
+}
+
 describe('createMCP', () => {
   let mockSetup: Mock<MCPConfig['setup']>;
 
@@ -79,15 +87,32 @@ describe('createMCP', () => {
     expect(() => createMCP({ serviceId: '', setup: mockSetup })).toThrow();
   });
 
-  it('does not start health server when setup rejects', async () => {
-    const { startHealthServer } = await import('../src/health.js');
+  it('exits when setup rejects in stdio mode, where setup runs at startup', async () => {
+    const { resolveTransport, wireStdioTransport } = await import('../src/transport.js');
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
     mockSetup.mockRejectedValueOnce(new Error('setup failed'));
 
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
     createMCP(makeConfig());
     await tick();
 
-    expect(startHealthServer).not.toHaveBeenCalled();
+    expect(wireStdioTransport).not.toHaveBeenCalled();
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    exitSpy.mockRestore();
+  });
+
+  it('answers a failing setup per session in HTTP mode, and keeps the process up', async () => {
+    const { startHealthServer } = await import('../src/health.js');
+    mockSetup.mockRejectedValueOnce(new Error('setup failed'));
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+    createMCP(makeConfig());
+    await tick();
+    const createSessionServer = await sessionFactory();
+
+    await expect(createSessionServer()).rejects.toThrow('setup failed');
+    expect(startHealthServer).toHaveBeenCalledOnce();
+    expect(exitSpy).not.toHaveBeenCalled();
     exitSpy.mockRestore();
   });
 
@@ -112,6 +137,7 @@ describe('createMCP', () => {
 
     createMCP(makeConfig());
     await tick();
+    await (await sessionFactory())();
 
     expect(startHealthServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 3001 }),
@@ -122,13 +148,20 @@ describe('createMCP', () => {
     );
   });
 
-  it('calls setup with the McpServer instance and context', async () => {
+  it('runs setup on a fresh McpServer for each HTTP session', async () => {
     createMCP(makeConfig());
     await tick();
+    expect(mockSetup).not.toHaveBeenCalled();
 
-    expect(mockSetup).toHaveBeenCalledOnce();
+    const createSessionServer = await sessionFactory();
+    const first = await createSessionServer();
+    const second = await createSessionServer();
+
+    expect(first).not.toBe(second);
+    expect(mocks.serverInstances).toEqual([first, second]);
+    expect(mockSetup).toHaveBeenCalledTimes(2);
     expect(mockSetup).toHaveBeenCalledWith(
-      mocks.serverInstances[0],
+      first,
       expect.objectContaining({
         logger: mocks.mockLogger,
         clients: {},
@@ -136,11 +169,23 @@ describe('createMCP', () => {
     );
   });
 
+  it('runs setup once at startup in stdio mode', async () => {
+    const { resolveTransport, wireStdioTransport } = await import('../src/transport.js');
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    createMCP(makeConfig());
+    await tick();
+
+    expect(mockSetup).toHaveBeenCalledOnce();
+    expect(wireStdioTransport).toHaveBeenCalledWith(mocks.serverInstances[0]);
+  });
+
   it('clients are accessible in MCPContext', async () => {
     const mockClient = { name: 'test-client' } as NonNullable<Parameters<typeof createMCP>[0]['clients']>[number];
 
     createMCP(makeConfig({ clients: [mockClient] }));
     await tick();
+    await (await sessionFactory())();
 
     expect(mockSetup).toHaveBeenCalledWith(
       expect.anything(),

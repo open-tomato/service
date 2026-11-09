@@ -39,8 +39,15 @@ createMCP({
 
 By default the server listens over HTTP with the SDK's Streamable HTTP
 transport, on `PORT` or `8080`; it answers on any path, so clients can use
-`http://localhost:8080/mcp`. With `MCP_TRANSPORT=stdio` it talks over stdin
-and stdout instead, which is how desktop MCP clients start a local server.
+`http://localhost:8080/mcp`. Each client gets its own session: its
+`initialize` builds a fresh `McpServer`, runs `setup` against it, and the
+`Mcp-Session-Id` header routes the client's later requests to it. Several
+clients can be connected at once, and a client can reconnect without a
+restart. A request with a session id the server no longer holds gets
+`404`, the spec's signal to start a new session. `setup` runs once per
+connecting client in this mode, so keep its side effects cheap. With
+`MCP_TRANSPORT=stdio` it talks over stdin and stdout instead, which is how
+desktop MCP clients start a local server, and `setup` runs once at startup.
 Under stdio, anything on stdout that is not protocol breaks the session,
 and the server's logger writes to stdout today. Run a stdio server with
 `LOG_LEVEL=silent`, or log from your tools to stderr, until the logger
@@ -99,15 +106,16 @@ A small HTTP server, separate from the MCP transport, answers `GET` on
 ```
 
 It answers `200` while the status is `ok` or `degraded`, and `503` once it
-is `error`. `buildHealthResponse` and `startHealthServer` are exported for
-custom setups.
+is `error`. `buildHealthResponse`, `startHealthServer` and
+`createHttpSessions`, the per-client session table, are exported for custom
+setups.
 
 ## Configuration
 
 | Field | Default | Meaning |
 |---|---|---|
 | `serviceId` | required | names the server in logs and health |
-| `setup(server, ctx)` | required | registers tools, resources and prompts; `ctx` has `logger` and `clients` |
+| `setup(server, ctx)` | required | registers tools, resources and prompts, once per HTTP session; `ctx` has `logger` and `clients` |
 | `clients` | `[]` | HTTP clients whose state the health response reports |
 | `health.port` | `3001` | the health server's port |
 | `health.path` | `'/health'` | the health route |
@@ -119,8 +127,9 @@ custom setups.
 | `PORT` | `8080` | the HTTP transport's port |
 | `LOG_LEVEL` | `info` | the logger's level |
 
-`createMCP` returns `{ stop(), healthUrl() }`; `stop()` closes the
-transport and the health server, and `SIGTERM` calls it for you.
+`createMCP` returns `{ stop(), healthUrl() }`; `stop()` closes every
+session, the transport and the health server, and `SIGTERM` calls it for
+you.
 
 ## Requirements
 
