@@ -6,5 +6,8 @@ export type { HealthResponse, HealthServerConfig, HealthServerHandle } from './h
 
 export { resolveTransport } from './transport.js';
 
+export { createHttpSessions } from './http-sessions.js';
+export type { HttpSessions, HttpSessionsOptions, SessionServerFactory } from './http-sessions.js';
+
 export { createHttpClient } from '@open-tomato/service';
 export type { TypedClient, ClientsMap } from '@open-tomato/service';

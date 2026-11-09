@@ -1,8 +1,18 @@
 # create-mcp
 
-`createMCP(config)` builds the MCP server and starts it in the background:
-it returns its handle at once, then awaits `setup`, wires the transport
-and, in HTTP mode, starts the health server.
+`createMCP(config)` starts the MCP server in the background: it returns its
+handle at once, then wires the transport and, in HTTP mode, starts the
+health server.
+
+## When `setup` runs
+
+`setup` runs against a fresh `McpServer` each time one is built. In HTTP
+mode that is once per client session, when the client's `initialize`
+arrives, because a stateful transport serves one session and an
+`McpServer` connects to one transport (`http-sessions.md`). A `setup` that
+throws there answers that client `500`, is logged, and leaves the server
+up. In `stdio` mode it runs once, before the transport is wired, and a
+`setup` that throws fails the start.
 
 ## What the handle reports
 
@@ -15,7 +25,8 @@ and, in HTTP mode, starts the health server.
 - `healthUrl()` names the asked health port until `ready()` resolves, then
   the bound one, which differs after a fallback. Once started in `stdio`
   mode it returns an empty string.
-- `stop()` closes the transport, then the health server; `SIGTERM` calls it.
+- `stop()` closes the transport, which in HTTP mode ends every session,
+  then the health server; `SIGTERM` calls it.
 
 The transport and health ports come from `resolvePortConfig` (`listen.md`)
 and are picked by `wireHttpTransport` (`transport.md`) and
@@ -73,13 +84,18 @@ and on stdio with `logger: { destination: 'stdout' }`, the `version` and
 `NODE_ENV=test` and its absence under it, the `configKey` each server
 receives with and without `PORT` and `HEALTH_PORT` set, that the transport
 is closed when the health server fails, and that an unawaited failure
-raises no `unhandledRejection`. Removing the rejection handler, the
+raises no `unhandledRejection`. It also calls the session factory the
+mocked transport received, to check that HTTP mode runs `setup` on a fresh
+server per session and none at startup, that a failing `setup` there
+leaves the server started, and that `stdio` runs `setup` once on the
+server its transport gets. Removing the rejection handler, the
 test-mode guard, the transport close, the configured version,
 `healthFallbackPort`, the bound `healthUrl`, the stderr pick, the config's
 precedence over it, the absence of `url` on the stdio record or the
 `configKey` handed on each fails at least one case.
-`tests/createMCP.ports.integration.test.ts` holds both ports with real
-sockets and checks the fallback, the strict rejection, and the message of
+`tests/createMCP.ports.integration.test.ts` catches the logger where
+`createMCP` builds it, holds both ports with real sockets, and checks the
+fallback, the strict rejection, and the message of
 that rejection: `health.port` when the config set the port, `HEALTH_PORT`
 or `PORT` when the variable did.
 

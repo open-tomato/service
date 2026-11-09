@@ -6,7 +6,7 @@ import process from 'node:process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMCP } from '../src/create-mcp.js';
-import { resolveTransport } from '../src/transport.js';
+import { resolveTransport, wireHttpTransport } from '../src/transport.js';
 
 const mocks = vi.hoisted(() => {
   const transportClose = vi.fn().mockResolvedValue(undefined);
@@ -106,6 +106,8 @@ describe('createMCP log destination', () => {
   it('writes the setup line to stdout only on HTTP', async () => {
     const handle = createMCP(makeConfig());
     await handle.ready();
+    // HTTP runs setup per session: open one through the factory the transport got.
+    await vi.mocked(wireHttpTransport).mock.calls.at(-1)?.[0].createSessionServer();
 
     expect(written(stdoutSpy)).toContain(SETUP_MESSAGE);
     expect(written(stderrSpy)).not.toContain(SETUP_MESSAGE);

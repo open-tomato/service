@@ -81,7 +81,9 @@ export default [
     rules: {
       // The packages' own names resolve to `dist/` only after a build,
       // and CI lints before it builds.
-      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/service'] }],
+      // The MCP SDK is installed under its package only, which the resolver
+      // does not see from a fence.
+      'import/no-unresolved': ['error', { ignore: ['^bun:', '^@open-tomato/service', '^@modelcontextprotocol/'] }],
     },
     settings: {
       // Without `dist/` the packages' names are unresolved and would sort

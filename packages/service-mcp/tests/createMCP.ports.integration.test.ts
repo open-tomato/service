@@ -15,6 +15,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMCP } from '../src/create-mcp.js';
 
+// HTTP mode runs `setup` per session, after the ports are picked, so the
+// logger is caught where createMCP builds it instead of from inside `setup`.
+const built = vi.hoisted(() => ({ logger: undefined as Logger | undefined }));
+
+vi.mock('@open-tomato/service-logger', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@open-tomato/service-logger')>();
+  return {
+    ...actual,
+    createLogger: (...args: Parameters<typeof actual.createLogger>) => {
+      const logger = actual.createLogger(...args);
+      built.logger = logger;
+      return logger;
+    },
+  };
+});
+
 // Unique ports: other test files use 3001 to 3099 and 8080 to 8097.
 const MCP_PORT = 8111;
 const HEALTH_PORT = 3111;
@@ -50,9 +66,9 @@ describe('createMCP port fallback over real servers', () => {
   let info: ReturnType<typeof vi.spyOn> | undefined;
 
   /**
-   * Starts a handle on the held ports, spying on its logger from inside
-   * `setup`. `ports` replaces the port fields of the config, so a case can
-   * leave a port to the environment.
+   * Starts a handle on the held ports, spying on the logger it built before
+   * any port is picked. `ports` replaces the port fields of the config, so a
+   * case can leave a port to the environment.
    */
   function start(
     health: { strictPort?: boolean } = {},
@@ -62,11 +78,12 @@ describe('createMCP port fallback over real servers', () => {
       serviceId: 'ports-test',
       ...ports,
       logger: { level: 'silent' },
-      setup: (_server, { logger }: { logger: Logger }) => {
-        warn = vi.spyOn(logger, 'warn');
-        info = vi.spyOn(logger, 'info');
-      },
+      setup: () => {},
     });
+    // createMCP builds its logger synchronously; the ports are picked later.
+    if (built.logger === undefined) throw new Error('createMCP built no logger');
+    warn = vi.spyOn(built.logger, 'warn');
+    info = vi.spyOn(built.logger, 'info');
     return handle;
   }
 

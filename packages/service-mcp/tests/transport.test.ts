@@ -84,8 +84,8 @@ describe('wireHttpTransport', () => {
   });
 
   function wire(overrides: Partial<HttpTransportConfig> = {}): Promise<HttpTransportHandle> {
-    const server = new McpServer({ name: 'svc', version: '1.0.0' });
-    return wireHttpTransport(server, { port: 0, strict: false, logger, ...overrides });
+    const createSessionServer = (): McpServer => new McpServer({ name: 'svc', version: '1.0.0' });
+    return wireHttpTransport({ createSessionServer, port: 0, strict: false, logger, ...overrides });
   }
 
   it('resolves with the port it is bound to, the system\'s choice for port 0', async () => {

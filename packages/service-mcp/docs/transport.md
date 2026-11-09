@@ -4,12 +4,15 @@ Picks and connects the MCP transport.
 
 - `resolveTransport()` reads `MCP_TRANSPORT` at call time: `stdio` answers
   `'stdio'`, and any other value, or none, answers `'http'`.
-- `wireHttpTransport(server, config)` builds a stateful
-  `StreamableHTTPServerTransport`, starts a `node:http` server that hands
-  every request to it, and connects it to `server`. It resolves once the
-  server listens, with the `transport`, the bound `port`, the `requested`
-  port, `fellBack`, and `close()`, which closes the transport, then drops
-  open connections and closes the server.
+- `wireHttpTransport(config)` starts a `node:http` server that hands every
+  request to a session table from `createHttpSessions`
+  (`http-sessions.md`): each client's `initialize` gets its own stateful
+  `StreamableHTTPServerTransport`, connected to a fresh server from
+  `config.createSessionServer`. It resolves once the server listens, with
+  the bound `port`, the `requested` port, `fellBack`, `sessionCount()`, and
+  `close()`, which ends every session, then drops open connections and
+  closes the server. A session that cannot be opened, and a request that
+  fails, are logged at `error`.
 - `wireStdioTransport(server)` connects a `StdioServerTransport` over the
   process's stdin and stdout.
 
@@ -41,9 +44,12 @@ nothing, and that an `error` emitted after listening reaches
 `logger.error`. Removing the `onPicked` hook fails the fallback case, and
 removing the `error` listener fails the last one, so both checks can fail.
 
-`tests/http-transport.integration.test.ts` runs an MCP client against the
-transport with the `Bun` global removed, calls a tool, and checks the
-port is free again after `close()`.
+`tests/http-transport.integration.test.ts` runs the SDK's own client
+against the transport with the `Bun` global removed: one client calls a
+tool and the port is free again after `close()`, two clients connect at
+once and each list tools on their own session, a client ends its session
+and connects again without a restart, and `close()` ends every open
+session.
 
 ## Usage
 

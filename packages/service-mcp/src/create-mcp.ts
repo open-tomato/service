@@ -98,17 +98,22 @@ function loggerOptionsFor(transport: MCPTransport, options: LoggerOptions | unde
  * The `clients` array is indexed into a `ClientsMap` keyed by each client's
  * `name` property (set when the client was constructed via `createHttpClient`).
  *
- * **2. Setup** — `config.setup(server, ctx)` is awaited. Register all tools,
- * resources, and prompts here. If this callback throws or rejects, the start
- * fails and the health server is never started.
+ * **2. Setup** — `config.setup(server, ctx)` is awaited against each new
+ * `McpServer`. Register all tools, resources, and prompts here. In HTTP mode
+ * it runs once per client session, when that client's `initialize` arrives;
+ * a throw or rejection answers that client `500`, is logged, and leaves the
+ * server up. In stdio mode it runs once before the transport is wired, and a
+ * throw or rejection fails the start.
  *
  * **3. Transport** — the transport picked at Init is wired; the pick follows
  * the `MCP_TRANSPORT` environment variable:
- * - _(default)_ `MCP_TRANSPORT` unset or any value other than `'stdio'`:
- *   `StreamableHTTPServerTransport` in stateful mode
- *   (`sessionIdGenerator: () => randomUUID()`), served by a Node HTTP server
- *   on `port`, else `PORT`, else `8080`. Stateless mode is intentionally avoided — it breaks the MCP
- *   `initialize` handshake which requires at least two HTTP round-trips.
+ * - _(default)_ `MCP_TRANSPORT` unset or any value other than `'stdio'`: a
+ *   Node HTTP server on `port`, else `PORT`, else `8080`, that serves one
+ *   MCP session per client. Each `initialize` gets its own stateful
+ *   `StreamableHTTPServerTransport` and its own `McpServer`, and later
+ *   requests reach their session by the `Mcp-Session-Id` header. Stateless
+ *   mode is intentionally avoided — it breaks the MCP `initialize` handshake
+ *   which requires at least two HTTP round-trips.
  * - `MCP_TRANSPORT=stdio`: `StdioServerTransport` for local dev and Claude
  *   Desktop integration. The health server is **not** started in this mode.
  *
@@ -131,7 +136,8 @@ function loggerOptionsFor(transport: MCPTransport, options: LoggerOptions | unde
  * **6. SIGTERM** — a one-time `SIGTERM` handler is registered _before_
  * `start()` is invoked so that signals received during the async setup phase
  * are still caught. On signal: the MCP transport is closed (draining in-flight
- * requests), then the health server is stopped. Both steps use optional
+ * requests, and in HTTP mode ending every session), then the health server is
+ * stopped. Both steps use optional
  * chaining so they are safe no-ops if startup had not yet reached those phases.
  *
  * **`clients` key caveat** — keys in `MCPContext.clients` are the `name` values
@@ -181,7 +187,6 @@ export function createMCP(config: MCPConfig): MCPHandle {
   const transport = resolveTransport();
   const logger = createLogger(resolved.serviceId, loggerOptionsFor(transport, resolved.logger));
   const clientsMap = buildClientsMap(resolved.clients);
-  const server = new McpServer({ name: resolved.serviceId, version: resolved.version });
 
   let transportInstance:
     | Awaited<ReturnType<typeof wireHttpTransport>>
@@ -215,14 +220,23 @@ export function createMCP(config: MCPConfig): MCPHandle {
   }
 
   /**
-   * Initialises the server: invokes `setup`, wires the transport, starts the
-   * health server (HTTP mode only) and writes the banner.
+   * Builds one `McpServer` and runs `setup` against it. HTTP mode calls this
+   * once per client session; stdio mode calls it once at startup.
+   */
+  async function createSessionServer(): Promise<McpServer> {
+    const server = new McpServer({ name: resolved.serviceId, version: resolved.version });
+    await resolved.setup(server, { logger, clients: clientsMap });
+    return server;
+  }
+
+  /**
+   * Initialises the server: wires the transport, starts the health server
+   * (HTTP mode only) and writes the banner. In stdio mode `setup` runs here,
+   * once; in HTTP mode it runs per session.
    */
   async function start(): Promise<MCPAddress> {
-    await resolved.setup(server, { logger, clients: clientsMap });
-
     if (transport === 'stdio') {
-      transportInstance = await wireStdioTransport(server);
+      transportInstance = await wireStdioTransport(await createSessionServer());
       address = { transport: 'stdio' };
       logStarted(logger, {
         version: resolved.version,
@@ -232,7 +246,8 @@ export function createMCP(config: MCPConfig): MCPHandle {
       return address;
     }
 
-    const http = await wireHttpTransport(server, {
+    const http = await wireHttpTransport({
+      createSessionServer,
       port: ports.port,
       strict: ports.strict,
       configKey: ports.configKey,

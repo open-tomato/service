@@ -61,6 +61,13 @@ function tick(): Promise<void> {
 }
 
 type HttpHandle = Awaited<ReturnType<typeof wireHttpTransport>>;
+
+/** The session server factory the nth createMCP handed the mocked wireHttpTransport. */
+function sessionFactory(call = 0): () => Promise<unknown> {
+  const config = vi.mocked(wireHttpTransport).mock.calls[call]?.[0];
+  if (config === undefined) throw new Error('wireHttpTransport was not called');
+  return async () => config.createSessionServer();
+}
 type HealthHandle = Awaited<ReturnType<typeof startHealthServer>>;
 
 /** Makes the next HTTP transport and health server report these picks. */
@@ -108,16 +115,26 @@ describe('createMCP', () => {
     expect(() => createMCP({ serviceId: '', setup: mockSetup })).toThrow();
   });
 
-  it('does not start health server when setup rejects', async () => {
-    const { startHealthServer } = await import('../src/health.js');
+  it('rejects ready() when setup rejects in stdio mode, where setup runs at startup', async () => {
+    const { wireStdioTransport } = await import('../src/transport.js');
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
     mockSetup.mockRejectedValueOnce(new Error('setup failed'));
 
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
-    createMCP(makeConfig());
-    await tick();
+    const handle = createMCP(makeConfig());
 
-    expect(startHealthServer).not.toHaveBeenCalled();
-    exitSpy.mockRestore();
+    await expect(handle.ready()).rejects.toThrow('setup failed');
+    expect(wireStdioTransport).not.toHaveBeenCalled();
+  });
+
+  it('keeps the HTTP server up when setup rejects for one session', async () => {
+    mockSetup.mockRejectedValueOnce(new Error('setup failed'));
+
+    const handle = createMCP(makeConfig());
+    await handle.ready();
+
+    await expect(sessionFactory()()).rejects.toThrow('setup failed');
+    expect(startHealthServer).toHaveBeenCalledOnce();
+    expect(startedRecords()).toHaveLength(1);
   });
 
   it('SIGTERM before startup completes does not hang', async () => {
@@ -141,6 +158,7 @@ describe('createMCP', () => {
 
     createMCP(makeConfig());
     await tick();
+    await sessionFactory()();
 
     expect(startHealthServer).toHaveBeenCalledWith(
       expect.objectContaining({ port: 3001 }),
@@ -155,7 +173,7 @@ describe('createMCP', () => {
     createMCP(makeConfig());
     await tick();
 
-    expect(wireHttpTransport).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ configKey: 'port' }));
+    expect(wireHttpTransport).toHaveBeenCalledWith(expect.objectContaining({ configKey: 'port' }));
     expect(startHealthServer).toHaveBeenCalledWith(expect.objectContaining({ configKey: 'health.port' }));
   });
 
@@ -167,7 +185,6 @@ describe('createMCP', () => {
     await tick();
 
     expect(wireHttpTransport).toHaveBeenCalledWith(
-      expect.anything(),
       expect.objectContaining({ port: 8123, configKey: 'PORT' }),
     );
     expect(startHealthServer).toHaveBeenCalledWith(
@@ -175,13 +192,19 @@ describe('createMCP', () => {
     );
   });
 
-  it('calls setup with the McpServer instance and context', async () => {
+  it('runs setup on a fresh McpServer for each HTTP session, none at startup', async () => {
     createMCP(makeConfig());
     await tick();
+    expect(mockSetup).not.toHaveBeenCalled();
 
-    expect(mockSetup).toHaveBeenCalledOnce();
+    const first = await sessionFactory()();
+    const second = await sessionFactory()();
+
+    expect(first).not.toBe(second);
+    expect(mocks.serverInstances).toEqual([first, second]);
+    expect(mockSetup).toHaveBeenCalledTimes(2);
     expect(mockSetup).toHaveBeenCalledWith(
-      mocks.serverInstances[0],
+      first,
       expect.objectContaining({
         logger: mocks.mockLogger,
         clients: {},
@@ -189,11 +212,23 @@ describe('createMCP', () => {
     );
   });
 
+  it('runs setup once at startup in stdio mode, on the server the transport gets', async () => {
+    const { wireStdioTransport } = await import('../src/transport.js');
+    vi.mocked(resolveTransport).mockReturnValueOnce('stdio');
+
+    createMCP(makeConfig());
+    await tick();
+
+    expect(mockSetup).toHaveBeenCalledOnce();
+    expect(wireStdioTransport).toHaveBeenCalledWith(mocks.serverInstances[0]);
+  });
+
   it('clients are accessible in MCPContext', async () => {
     const mockClient = { name: 'test-client' } as NonNullable<Parameters<typeof createMCP>[0]['clients']>[number];
 
     createMCP(makeConfig({ clients: [mockClient] }));
     await tick();
+    await sessionFactory()();
 
     expect(mockSetup).toHaveBeenCalledWith(
       expect.anything(),
@@ -465,9 +500,12 @@ describe('createMCP', () => {
     expect(startedRecords()).toEqual([expect.objectContaining({ version: 'unknown', features: {} })]);
   });
 
-  it('passes the configured version to McpServer, unknown when none is given', () => {
+  it('passes the configured version to McpServer, unknown when none is given', async () => {
     createMCP(makeConfig({ version: '3.0.0' }));
     createMCP(makeConfig());
+    await tick();
+    await sessionFactory(0)();
+    await sessionFactory(1)();
 
     expect(mocks.serverInfos).toEqual([
       { name: 'test-mcp', version: '3.0.0' },
