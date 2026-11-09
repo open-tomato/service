@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 — 2026-11-09, HTTP mode serves one MCP session per client
+<!-- rafa:fragments mcp-http-sessions -->
+
+- mcp: HTTP mode opens a session per client, keyed by Mcp-Session-Id; several clients connect at once and a client reconnects without a restart
+- mcp: setup runs once per HTTP session on a fresh McpServer, and once at startup under stdio
+- mcp: a stale session id gets 404, a header-less non-initialize request 400, a failing setup 500 without taking the process down
+
 ## 2.0.1 — 2026-11-07, MCP's taken-port error names the variable that set the port
 <!-- rafa:fragments mcp-port-error-names-env -->
 
