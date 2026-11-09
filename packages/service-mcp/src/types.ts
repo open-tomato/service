@@ -93,11 +93,12 @@ export interface MCPConfig {
   clients?: TypedClient<unknown>[]
 
   /**
-   * Callback that registers tools, resources, and prompts against the
-   * `McpServer` instance. Called once during server startup after all
-   * clients have been started.
+   * Callback that registers tools, resources, and prompts against an
+   * `McpServer` instance. In HTTP mode it is called once per client session,
+   * with a fresh server for that session; in stdio mode it is called once at
+   * startup. Side effects in it therefore run once per connecting client.
    *
-   * May be async — `createMCP` awaits it before opening the transport.
+   * May be async — `createMCP` awaits it before the server takes requests.
    *
    * @param server - The MCP SDK server instance to register tools against.
    * @param ctx    - Runtime context providing the logger and clients map.
