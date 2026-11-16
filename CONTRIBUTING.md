@@ -18,6 +18,8 @@ Use the **Spec issue template** to propose a change:
 
 The spec template ensures your proposal has the structure a plan can be built from. This is the fastest path to approval and implementation.
 
+A maintainer marks a spec ready, and rafa plans and implements it in a loop that opens the pull request. [context/rafa.md](context/rafa.md) covers that flow and how to set up rafa in a clone.
+
 ## Before Opening a Pull Request
 
 1. **Install dependencies:**

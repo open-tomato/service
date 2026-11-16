@@ -14,8 +14,8 @@ typed HTTP clients to other services, retry with backoff, and a circuit
 breaker that stops calling a failing peer. Adapters bind the core to a
 framework, so a service is mostly configuration and its endpoints.
 
-> **Status: 1.x.** The API is stable within the 1.x line. Version 2.0
-> adds Nest.js and Next.js support and changes parts of the contract; see
+> **Status: 2.x.** 2.0.0 changed parts of the 1.x contract, and the API is
+> stable within the 2.x line. Nest.js and Next.js support is planned; see
 > [the release lines](context/release.md#release-lines).
 
 ## Packages
@@ -91,6 +91,11 @@ Node.js 22 or later, or Bun. The packages are ESM only.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports go through
 [SECURITY.md](SECURITY.md), never a public issue.
+
+Planned work runs through [rafa](https://github.com/open-tomato/rafa): a
+spec on the board, a plan, and a loop that opens the pull request.
+[context/rafa.md](context/rafa.md) says where each piece lives and how to
+set up a clone, a worktree or a loop host.
 
 ## License
 
