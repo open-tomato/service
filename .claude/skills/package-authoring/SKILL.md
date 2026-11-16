@@ -1,6 +1,15 @@
 ---
 name: package-authoring
-description: "Use when adding a package (a new framework adapter such as service-nest or service-next), changing a package's manifest, exports, build or dependencies, or hitting a NodeNext import error (TS2834, TS2835) or a check-node failure."
+description: "Use when adding a package or adapter, changing a manifest, exports or build, or hitting a NodeNext import or check-node error."
+tags:
+  - packages
+  - manifest
+  - exports
+  - nodenext
+  - typescript
+stack:
+  - typescript
+  - javascript
 ---
 
 # Package authoring
@@ -17,7 +26,7 @@ adapter.
 | `package.json` | the manifest below |
 | `tsconfig.json` | `extends @open-tomato/typescript-config/node`; includes `src` and `tests` |
 | `tsconfig.build.json` | extends `./tsconfig.json` and `@open-tomato/typescript-config/build`; emits JS and declarations from `src` to `dist`; excludes tests |
-| `src/index.ts` | the only entry; everything public is exported from here |
+| `packages/<name>/src/index.ts` | the only entry; everything public is exported from here |
 | `src/*.test.ts` or `tests/` | vitest suites; both are type-checked |
 
 The manifest: `"type": "module"`, `"files": ["dist"]`,
@@ -27,7 +36,7 @@ never publish sets `"private": true`; check-node skips it.
 
 ## Rules that the gates enforce
 
-1. **Relative imports end in `.js`** (`./thing.js`, `./dir/index.js`).
+1. **Relative imports end in `.js`**: a sibling module is imported as `./<module>.js`, and a folder's index as `./<folder>/index.js`.
    The base tsconfig is NodeNext, so a missing extension fails check-types
    with TS2834 or TS2835. Package subpaths follow the package's own exports
    map: the MCP SDK takes `@modelcontextprotocol/sdk/server/mcp.js`.

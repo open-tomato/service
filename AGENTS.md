@@ -45,7 +45,8 @@ commit. Generated output goes to the gitignored `.docs/`.
 
 ## What is not tracked
 
-`.rafa/` (specs, plans and loop state), `.tmp/` (gate captures and scratch),
+`.rafa/` (specs, plans and loop state; rafa's tracked settings are
+`rafa.config.mjs`), `.tmp/` (gate captures and scratch),
 `.docs/`, `.reference/` and `progress.txt`. Specs live on the board as
 `type:spec` issues, and `rafa plan create --issue=<n>` snapshots one into
 `.rafa/specs/`. No tracked file may name a host, a home path, an IP address
@@ -59,6 +60,8 @@ Read the page for the subject at hand; none is loaded by default.
 - `context/verification.md`: the gates, scoped runs, test conventions
 - `context/privacy.md`: what a public repo must not carry, the hook, CI
 - `context/release.md`: versions, fragments and publishing
+- `context/rafa.md`: specs, plans and loops; the two config layers;
+  bootstrapping a clone, a worktree or a loop host; what a loop sees
 
 ## Skills and agents
 
@@ -66,7 +69,10 @@ Skills in `.claude/skills/`: `package-authoring` (manifests, NodeNext
 imports, adding an adapter), `documentation` (where text lives),
 `git-workflow`, `git-add-partial-failure`. Agents in `.claude/agents/`:
 `architect`, `loop-implementer`, `tdd-guide`, `code-reviewer`,
-`build-error-resolver`, `doc-updater`, `qa-bug-reporter`.
+`build-error-resolver`, `doc-updater`, `qa-bug-reporter`. A loop session
+sees these and rafa's own, never `~/.claude/`; `rafa.config.mjs` pins the
+copies whose names rafa also ships (`context/rafa.md`). A maintainer's
+private skills are listed, untracked, in `.rafa/private-skills.md`.
 
 This file is capped at 80 lines. A new fact goes to the context page that
 owns its subject, never inline here.

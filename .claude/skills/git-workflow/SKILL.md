@@ -37,7 +37,7 @@ Work that rafa plans from an issue carries the issue number with a `rafa-`
 prefix through the spec and branch workflow:
 
 - **Issue reference** (in prose): `#rafa-<n>` — e.g., `#rafa-20`
-- **Spec file**: `.rafa/specs/rafa-<n>-<slug>.md` — e.g., `.rafa/specs/rafa-20-pr-commands.md`
+- **Spec file**: `.rafa/specs/rafa-<n>-<slug>.md`, the snapshot `rafa plan create --issue=<n>` writes
 - **Plan stub** (in prose): `rafa-<n>-<slug>` — e.g., `rafa-20-pr-commands`
 - **Branch name**: `feat/rafa-<n>-<slug>` — e.g., `feat/rafa-20-pr-commands`
 - **PR title**: `rafa-<n>: <title>` — e.g., `rafa-20: Add PR commands`

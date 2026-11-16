@@ -1,6 +1,13 @@
 ---
 name: documentation
-description: "Use when writing or changing a doc block in source, adding or moving a file under packages/*/docs, or deciding where a piece of documentation belongs (source, the docs tree, a context page, or the gitignored .docs output)."
+description: "Use when writing a doc block, adding or moving a file under packages/*/docs, or deciding where documentation belongs."
+tags:
+  - documentation
+  - docs
+  - tsdoc
+  - markdown
+stack:
+  - typescript
 ---
 
 # Documentation
